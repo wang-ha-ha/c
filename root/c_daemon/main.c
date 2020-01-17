@@ -31,9 +31,7 @@ int main()
         int len=sizeof(struct sockaddr_in);
         connect_fd=accept(listen_fd,(struct sockaddr*)&addrClient,&len);
 
-        dup2(connect_fd,0); 
-        dup2(connect_fd,1); 
-        dup2(connect_fd,2); 
+
                 
         pid_t pid = fork();
         
@@ -44,14 +42,24 @@ int main()
         } 
         else if (pid == 0)
         {
-            execl("/system/bin/sh","sh",NULL);              
+            dup2(connect_fd,0); 
+            dup2(connect_fd,1); 
+            dup2(connect_fd,2); 
+            execl("/bin/bash","bash",NULL);              
+            close(connect_fd);
             exit(-1);              
         } 
+/*
+    这样做虽然可以多个客户端一起调用,但会导致每个客户端退出都产生一个僵尸进程
+*/
+#if 0        
         else {
             int status=0;
-            wait(&status);
-            printf("finish \n");
+            wait(&status);           
         }
+        
+        close(connect_fd);
+#endif        
     }    
     return 0;
 }
