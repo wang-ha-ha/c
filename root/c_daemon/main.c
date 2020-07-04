@@ -6,12 +6,16 @@
 #include<netinet/in.h>
 #include <sys/socket.h>
 
+void sigchld_handler(int sig)
+{
+    while(waitpid(-1, 0, WNOHANG) > 0);
+    return;
+}
+
 int main()
 {
-    
     //创建一个socket
     int listen_fd = socket(AF_INET,SOCK_STREAM,0);
-    
     
     //配置ip port 协议
     struct sockaddr_in addrSrc,addrClient;
@@ -24,6 +28,8 @@ int main()
  
     //监听
     listen(listen_fd,5);
+    
+    signal(SIGCHLD, sigchld_handler);
     
     while(1)
     {
@@ -57,9 +63,8 @@ int main()
             int status=0;
             wait(&status);           
         }
-        
-        close(connect_fd);
 #endif        
+        close(connect_fd);
     }    
     return 0;
 }
