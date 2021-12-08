@@ -217,7 +217,7 @@ int main(int argc, char **argv)
             int try = 10;
             while ( (--try) > 0 && (ringbuf_writ_byte(rb, g_packet_data[i]) != 0))
             {
-                usleep(1000 * 1);
+                usleep(1);
             }
 
             if(try == 0)

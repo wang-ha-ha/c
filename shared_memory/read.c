@@ -269,7 +269,7 @@ int wirelesscharge_c0c1_process(ringbuf *rb)
     while ((ret = receive_packet(rb,g_packet_data, &packet_length)) == 0)
     {   
         i++;
-        printf("i:%d\n",i);
+        // printf("i:%d\n",i);
         id = g_packet_data[PACKET_RS_ID_INDEX];
         type = g_packet_data[PACKET_RS_TYPE_INDEX];
         cmd = (unsigned short)(g_packet_data[PACKET_RS_CMD_INDEX] << 8 | g_packet_data[PACKET_RS_CMD_INDEX + 1]);
@@ -315,13 +315,13 @@ int wirelesscharge_c0c1_process(ringbuf *rb)
         //     // packet_length = wirelesscharge_c01c1_prepare_packet(cal_id(id), type, cmd, g_packet_send_data, send_packet_length, g_packet_data);
         //     // wirelesscharge_c0c1_transmit_packet(g_packet_data, packet_length);
         // }
-        printf("ID[%d]:The right package was read\n",id);
+        // printf("ID[%d]:The right package was read\n",id);
         // return 0;
     }
 
     if(ret == 2)
     {
-        printf("on data\n");
+        // printf("on data\n");
         return 2;
     }
     else if(ret != 0)
