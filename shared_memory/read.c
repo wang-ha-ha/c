@@ -267,7 +267,9 @@ int wirelesscharge_c0c1_process(ringbuf *rb)
     int i = 0,j = 0;
     int ret = 0;
     while ((ret = receive_packet(rb,g_packet_data, &packet_length)) == 0)
-    {
+    {   
+        i++;
+        printf("i:%d\n",i);
         id = g_packet_data[PACKET_RS_ID_INDEX];
         type = g_packet_data[PACKET_RS_TYPE_INDEX];
         cmd = (unsigned short)(g_packet_data[PACKET_RS_CMD_INDEX] << 8 | g_packet_data[PACKET_RS_CMD_INDEX + 1]);
@@ -314,7 +316,7 @@ int wirelesscharge_c0c1_process(ringbuf *rb)
         //     // wirelesscharge_c0c1_transmit_packet(g_packet_data, packet_length);
         // }
         printf("ID[%d]:The right package was read\n",id);
-        return 0;
+        // return 0;
     }
 
     if(ret == 2)
@@ -322,9 +324,13 @@ int wirelesscharge_c0c1_process(ringbuf *rb)
         printf("on data\n");
         return 2;
     }
+    else if(ret != 0)
+    {
+        printf("An error package was read\n");
+        return 1;
+    }
 
-    printf("An error package was read\n");
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -377,7 +383,7 @@ int main(int argc, char **argv)
 
         wirelesscharge_c0c1_process(rb);
 
-        usleep(1000 * 80); 
+        usleep(1000 * 2000); 
     }
 
     return 0;
