@@ -1,0 +1,38 @@
+#dasdad
+name: frank
+sex: male
+age: 18
+arg: 1.2
+
+score:
+  - 111
+  - 333
+  - 444
+  - 555
+
+skills: 
+  cpp:
+    - 123123
+    - 3444
+    - wnaghaha
+  java: 2
+  android: 3
+  python: 4
+  tttt:
+    abc: 12
+    ccc: 333
+    abcd:
+      c: 1
+      b: 2
+      d:
+        - d3123123
+        - cfffff
+        - gdasdas
+
+STATE:
+  MESSGAE3:
+    priority: 11
+    loop_time_ms: 2000
+  MESSGAE4:
+    priority: 100
+    loop_time_ms: 2000
