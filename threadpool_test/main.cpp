@@ -179,6 +179,7 @@ void *ThreadPoolManager(void *arg)
 	int i = 0;
 	while (!objThreadPool->m_iShutDown)
 	{
+		usleep(10000);
 		pthread_mutex_lock(&(objThreadPool->m_mutexLock));
 		int queueSize = objThreadPool->m_iQueueSize;
 		int liveThrNum = objThreadPool->m_iLiveNum;
@@ -417,22 +418,21 @@ void COutPutMsgProcUnit::Exit()
 		std::cout << m_name + " pthread_cancel " << m_pThreadID << std::endl;
 		pthread_cancel(m_pThreadID);
 	}
-	stop_flag = true;
 }
 
 COutPutMsgProcUnit::~COutPutMsgProcUnit()
 {
 }
 
-XMMap<XMString, CProcUnitBase*> m_mapProcUnitObj;
+XMMap<XMString, CProcUnitBase*> m_mapProcUnitObj_aaa;
 
 bool DelProcUnit(XMString strName)
 {
 	int iCount = 0;
-	iCount = m_mapProcUnitObj.count(strName);
+	iCount = m_mapProcUnitObj_aaa.count(strName);
 	if (iCount != 0)
 	{
-		COutPutMsgProcUnit * objOutPutMsgProcUnit = (COutPutMsgProcUnit*)m_mapProcUnitObj[strName];
+		COutPutMsgProcUnit * objOutPutMsgProcUnit = (COutPutMsgProcUnit*)m_mapProcUnitObj_aaa[strName];
 
 		if (objOutPutMsgProcUnit)
 		{
@@ -442,7 +442,7 @@ bool DelProcUnit(XMString strName)
 			}						
 		}
 
-		m_mapProcUnitObj.erase(strName);
+		m_mapProcUnitObj_aaa.erase(strName);
 	}
 
 	return true;
@@ -454,9 +454,56 @@ bool AddProcUnit(XMString strName, CProcUnitBase *objProcUnit)
 		return false;
 
 	DelProcUnit(strName);
-	m_mapProcUnitObj[strName] = objProcUnit;
+	m_mapProcUnitObj_aaa[strName] = objProcUnit;
 
 	std::cout << "objProcUnit:" << static_cast<const void *>(objProcUnit) << "  " << static_cast<const void *>(&objProcUnit) <<std::endl;
+	if (m_objThreadPool)
+		m_objThreadPool->ThreadPoolAddTask(objProcUnit);
+
+	return true;
+}
+
+XMMap<XMString, CProcUnitBase**> m_mapProcUnit;
+XMMap<XMString, CProcUnitBase*> m_mapProcUnitObj;
+XMMap<XMString, XMString> m_mapProcUnitStr;
+
+bool DelProcUnit_1(XMString strName)
+{
+	int iCount = 0;
+	iCount = m_mapProcUnitStr.count(strName);
+	if (iCount != 0)
+	{
+
+		COutPutMsgProcUnit ** objOutPutMsgProcUnit =
+			(COutPutMsgProcUnit**)m_mapProcUnit[m_mapProcUnitStr[strName]];
+
+		if (objOutPutMsgProcUnit && *objOutPutMsgProcUnit)
+		{
+			(*objOutPutMsgProcUnit)->Exit();
+			delete *objOutPutMsgProcUnit;
+			(*objOutPutMsgProcUnit) = NULL;
+		}
+
+		m_mapProcUnit.erase(m_mapProcUnitStr[strName]);
+		m_mapProcUnitObj.erase(m_mapProcUnitStr[strName]);
+		m_mapProcUnitStr.erase(strName);
+	}
+
+	return true;
+}
+
+
+bool AddProcUnit_1(XMString strName, CProcUnitBase * objProcUnit)
+{
+	if (!objProcUnit)
+		return false;
+
+	DelProcUnit_1(strName);
+	XMString strKey = strName + std::to_string(time(NULL));
+	m_mapProcUnitObj[strKey] = objProcUnit;
+	m_mapProcUnit[strKey] = &objProcUnit;
+	m_mapProcUnitStr[strName] = strKey;
+
 	if (m_objThreadPool)
 		m_objThreadPool->ThreadPoolAddTask(objProcUnit);
 
@@ -469,6 +516,7 @@ int main()
 	m_objThreadPool->Init(5, 50);
 
 	XMString name = "task";
+	XMString name_1 = "Atask";
 	int i = 0;
 
 	while (1)
@@ -491,6 +539,24 @@ int main()
 			AddProcUnit(name , task);
 			DelProcUnit(name);
 		}
+		if(c == 'A')
+		{
+			XMString taskname =  name_1 + std::to_string(i++);
+			COutPutMsgProcUnit *task = new COutPutMsgProcUnit(taskname);
+			AddProcUnit_1(name_1 , task);
+		}
+		else if(c == 'D')
+		{
+			DelProcUnit_1(name_1);
+		}
+		else if(c == 'T')
+		{
+			XMString taskname = name_1 + std::to_string(i++);
+			COutPutMsgProcUnit *task = new COutPutMsgProcUnit(taskname);
+			AddProcUnit_1(name_1 , task);
+			DelProcUnit_1(name_1);
+		}
+
 		else if(c == 'i')
 		{
 			std::cout << "ThreadPoolAllThreadNum:" << m_objThreadPool->ThreadPoolAllThreadNum() << std::endl;
