@@ -1,0 +1,10 @@
+*.o
+*.ko
+*.mod
+*.mod.c
+.*.cmd
+*.markers
+*.order
+*.symvers
+.tmp_versions
+wcq_test*
