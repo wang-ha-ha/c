@@ -8,3 +8,4 @@
 *.symvers
 .tmp_versions
 wcq_test*
+.vscode
