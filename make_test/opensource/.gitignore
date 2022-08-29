@@ -1,0 +1,4 @@
+*.o
+make.log
+install.log
+target/
