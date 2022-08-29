@@ -27,8 +27,6 @@ rootfs_install_yaml-cpp()
 {
     echo "[yaml-cpp] rootfs_install"
     cp -rf $INSTALL_DIR/yaml-cpp/lib/libyaml-cpp.so* $ROOTFS/lib
-    cp -rf $INSTALL_DIR/yaml-cpp/lib/libyaml-cpp.so* $CONFIG_TOP/app/70mai/lib
-    cp -rf $INSTALL_DIR/yaml-cpp/include/* $CONFIG_TOP/app/70mai/include
 }
 
 install_yaml-cpp()

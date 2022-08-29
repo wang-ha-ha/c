@@ -27,8 +27,6 @@ rootfs_install_quirc()
 	echo "[quirc] rootfs_install"
 	mkdir -p $ROOTFS/lib
 	cp -rf $INSTALL_DIR/quirc/lib/libquirc.so $ROOTFS/lib
-	cp -rf $INSTALL_DIR/quirc/lib/libquirc.so $CONFIG_TOP/app/70mai/lib
-	cp -rf $INSTALL_DIR/quirc/include/*  $CONFIG_TOP/app/70mai/include
 }
 
 install_quirc()

@@ -19,8 +19,6 @@ rootfs_install_RCF()
 	echo "[RCF] rootfs_install"
 	mkdir -p $ROOTFS/lib
 	cp -rf $INSTALL_DIR/RCF/lib/libRCF.so $ROOTFS/lib
-	cp -rf $INSTALL_DIR/RCF/lib/libRCF.so $CONFIG_TOP/app/70mai/lib
-	cp -rf $INSTALL_DIR/RCF/include/*  $CONFIG_TOP/app/70mai/include
 }
 
 install_RCF()

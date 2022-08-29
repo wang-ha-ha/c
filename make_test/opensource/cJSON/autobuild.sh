@@ -19,8 +19,6 @@ rootfs_install_cJSON()
 	echo "[cJSON] rootfs_install"
 	mkdir -p $ROOTFS/lib
 	cp -rf $INSTALL_DIR/cJSON/lib/* $ROOTFS/lib
-	cp -rf $INSTALL_DIR/cJSON/lib/* $CONFIG_TOP/app/70mai/lib
-	cp -rf $INSTALL_DIR/cJSON/include/* $CONFIG_TOP/app/70mai/include
 }
 
 install_cJSON()
