@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<link href="libs/video-js.min.css" rel="stylesheet">
+<script src="libs/video.min.js"></script>
+<script src="libs/flv.min.js"></script>
+<body>
+
+<p> [flv] - [file]</p>
+<p> http://localhost/vod/1.flv [html5] </p>
+<video id="video_4" class="video-js" controls muted width="640" height="264"></video>
+<script>
+    var video_4 = document.getElementById('video_4');
+    var flvPlayer_4 = flvjs.createPlayer({
+        type: 'flv',
+        url: '/vod/1.flv'
+    });
+    flvPlayer_4.attachMediaElement(video_4);
+    flvPlayer_4.load();
+    flvPlayer_4.play();
+</script>
+
+</body>
+</html>

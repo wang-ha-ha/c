@@ -1,0 +1,134 @@
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..ec3ca63
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,11 @@
++LOCAL_SRC_FILES := \
++	src/mp4_box.c \
++	src/mp4_track.c \
++	src/mp4_demux.c \
++	src/mp4_log.c \
++	test/mp4_demux_test.c \
++
++CC=arm-linux-gcc
++
++all:
++	$(CC) -Iinclude -Ilibfutils/include $(LOCAL_SRC_FILES) -O2 -o mp4_demux_test
+diff --git a/include/libmp4.h b/include/libmp4.h
+index 7e75eed..c61f614 100644
+--- a/include/libmp4.h
++++ b/include/libmp4.h
+@@ -45,6 +45,11 @@ extern "C"  {
+ 
+ #include <inttypes.h>
+ 
++#define OVT
++#ifdef OVT
++#define ULOG_DEBUG   7       /* debug-level message */
++#define ULOG_PRI(...)
++#endif
+ 
+ enum mp4_track_type {
+ 	MP4_TRACK_TYPE_UNKNOWN = 0,
+diff --git a/src/mp4_track.c b/src/mp4_track.c
+index 7d9a713..c8afe63 100644
+--- a/src/mp4_track.c
++++ b/src/mp4_track.c
+@@ -333,7 +333,7 @@ int mp4_tracks_build(
+ 		if (sampleCount != tk->sampleCount) {
+ 			MP4_LOGE("sample count mismatch: %d vs. %d",
+ 				sampleCount, tk->sampleCount);
+-			return -EPROTO;
++			//return -EPROTO;
+ 		}
+ 
+ 		tk->sampleOffset = malloc(sampleCount * sizeof(uint64_t));
+@@ -373,11 +373,10 @@ int mp4_tracks_build(
+ 		for (i = 0, sampleCount = 0;
+ 			i < tk->timeToSampleEntryCount; i++)
+ 			sampleCount += tk->timeToSampleEntries[i].sampleCount;
+-
+ 		if (sampleCount != tk->sampleCount) {
+ 			MP4_LOGE("sample count mismatch: %d vs. %d",
+ 				sampleCount, tk->sampleCount);
+-			return -EPROTO;
++			//return -EPROTO;
+ 		}
+ 
+ 		tk->sampleDecodingTime = malloc(sampleCount * sizeof(uint64_t));
+diff --git a/test/mp4_demux_test.c b/test/mp4_demux_test.c
+index cc9576c..62da09b 100644
+--- a/test/mp4_demux_test.c
++++ b/test/mp4_demux_test.c
+@@ -267,6 +267,10 @@ static void mp4_demux_print_chapters(struct mp4_demux *demux)
+ 	}
+ }
+ 
++#ifdef OVT
++#define BUFFER_SIZE (1*1024*1024)
++uint8_t sample_buffer[BUFFER_SIZE];
++#endif
+ 
+ static void mp4_demux_print_frames(struct mp4_demux *demux)
+ {
+@@ -289,16 +293,50 @@ static void mp4_demux_print_frames(struct mp4_demux *demux)
+ 	if (!found)
+ 		return;
+ 
++#ifdef OVT
++	/*
++	 * Extract each video samples and generate h264 file.
++	 * A header data h264_hdr should be reconstracted from mp4 meta data.
++	 * But for simplicity, it uses constant here.
++	 */
++	FILE *fp_h264 = fopen("out.h264", "w+");
++	if (fp_h264 == NULL) {
++		fprintf(stderr, "Failed to open h264 file\n");
++		return;
++	}
++	uint8_t h264_hdr[] = {0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x00, 0x28, 0xac, 0x3c, 0xa8, 0x07, 0x80, 0x22, 0x5e, 0x58,
++						  0x40, 0x00, 0x00, 0xfa, 0x00, 0x00, 0x2e, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++						  0x00, 0x00, 0x00, 0x01, 0x68, 0xee, 0x35, 0x25};
++	fwrite(h264_hdr, 1, sizeof(h264_hdr), fp_h264);
++#endif
++
+ 	i = 0;
+ 	do {
++#ifdef OVT
++		/*
++		 * Retrieve a video sample
++		 */
++		ret = mp4_demux_get_track_next_sample(demux, id,
++			sample_buffer, 1*1024*1024, NULL, 0, &sample);
++#else
+ 		ret = mp4_demux_get_track_next_sample(demux, id,
+ 			NULL, 0, NULL, 0, &sample);
++#endif
+ 		if (ret == 0) {
+ 			printf("Frame #%d size=%06" PRIu32
+ 				" metadata_size=%" PRIu32 " dts=%" PRIu64
+ 				" next_dts=%" PRIu64 "\n",
+ 				i, sample.sample_size, sample.metadata_size,
+ 				sample.sample_dts, sample.next_sample_dts);
++#ifdef OVT
++			/*
++			 * Replace the first 4 bytes with 00 00 00 01,
++			 * then write to the h264 file.
++			 */
++			uint8_t hdr[4] = {0x00, 0x00, 0x00, 0x01};
++			fwrite(hdr, 1, 4, fp_h264);
++			fwrite(sample_buffer+4, 1, sample.sample_size-4, fp_h264);
++#endif
+ 		}
+ 		i++;
+ 	} while (sample.sample_size);
+@@ -335,7 +373,7 @@ int main(int argc, char **argv)
+ 		mp4_demux_print_tracks(demux);
+ 		mp4_demux_print_metadata(demux);
+ 		mp4_demux_print_chapters(demux);
+-#if 0
++#ifdef OVT
+ 		mp4_demux_print_frames(demux);
+ #endif
+ 	}

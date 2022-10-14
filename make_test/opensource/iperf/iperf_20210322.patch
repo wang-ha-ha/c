@@ -1,0 +1,12 @@
+--- iperf-2.0.5/configure	2021-03-12 10:01:41.447699849 -0800
++++ iperf-2.0.5/configure.change	2021-03-12 10:06:08.494807015 -0800
+@@ -6959,7 +6959,8 @@
+ { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_bool" >&5
+ $as_echo "$ac_cv_sizeof_bool" >&6; }
+ 
+-
++### gcc 10.2.x on 20210308
++ac_cv_sizeof_bool=4
+ 
+ cat >>confdefs.h <<_ACEOF
+ #define SIZEOF_BOOL $ac_cv_sizeof_bool

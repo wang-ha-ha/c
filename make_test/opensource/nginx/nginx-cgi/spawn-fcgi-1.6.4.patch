@@ -1,0 +1,11 @@
+--- spawn-fcgi-1.6.4/configure	2014-06-05 19:51:38.000000000 +0800
++++ spawn-fcgi-1.6.4_new/configure	2022-02-09 15:50:19.095772962 +0800
+@@ -4964,7 +4964,7 @@
+ esac
+ 
+ 
+-$as_echo "#define malloc rpl_malloc" >>confdefs.h
++#$as_echo "#define malloc rpl_malloc" >>confdefs.h
+ 
+ fi
+ 

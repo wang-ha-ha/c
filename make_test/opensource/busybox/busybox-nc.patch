@@ -1,0 +1,12 @@
+diff -ur 0/busybox-1.27.2/networking/nc.c 1/busybox-1.27.2/networking/nc.c
+--- 0/busybox-1.27.2/networking/nc.c	2017-07-06 08:14:57.000000000 -0700
++++ 1/busybox-1.27.2/networking/nc.c	2020-01-29 12:31:53.998708245 -0800
+@@ -230,7 +230,7 @@
+ 		/* child, or main thread if only one -l */
+ 		xmove_fd(cfd, 0);
+ 		xdup2(0, 1);
+-		/*xdup2(0, 2); - original nc 1.10 does this, we don't */
++		xdup2(0, 2);
+ 		IF_NC_EXTRA(BB_EXECVP(execparam[0], execparam);)
+ 		IF_NC_EXTRA(bb_perror_msg_and_die("can't execute '%s'", execparam[0]);)
+ 	}

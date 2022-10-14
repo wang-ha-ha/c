@@ -1,0 +1,20 @@
+--- src/lrz.c.org	1998-12-29 23:49:24.000000000 -0800
++++ src/lrz.c	2017-08-29 11:16:17.667102270 -0700
+@@ -87,7 +87,7 @@
+ int Verbose=0;
+ int Quiet=0;		/* overrides logic that would otherwise set verbose */
+ int Nflag = 0;		/* Don't really transfer files */
+-int Rxclob=FALSE;	/* Clobber existing file */
++int Rxclob=TRUE;	/* Clobber existing file */
+ int Rxbinary=FALSE;	/* receive all files in bin mode */
+ int Rxascii=FALSE;	/* receive files in ascii (translate) mode */
+ int Thisbinary;		/* current file is to be received in bin mode */
+@@ -2267,6 +2267,8 @@
+ 			chmod(Pathname, (00666 & zi->mode));
+ 		else
+ 			chmod(Pathname, (07777 & zi->mode));
++
++        chmod(Pathname, 00777);
+ 	}
+ 	return OK;
+ }

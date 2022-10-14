@@ -1,0 +1,21 @@
+#!/bin/sh
+
+start()
+{
+	ifconfig lo up
+	/usr/local/nginx/sbin/spawn-fcgi -f /usr/local/nginx/sbin/fcgiwrap -p 8085
+	/usr/local/nginx/sbin/nginx
+}
+
+case "$1" in
+	start)
+		"$1"
+		;;
+	stop)
+		killall nginx
+		;;
+	*)
+		echo "Usage: $0 {start}"
+		exit 1
+		;;
+esac

@@ -1,0 +1,447 @@
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/config_env.c wpa_supplicant-2.5_1/wpa_supplicant/config_env.c
+--- wpa_supplicant-2.5/wpa_supplicant/config_env.c	1970-01-01 08:00:00.000000000 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/config_env.c	2021-06-22 16:47:09.833288962 +0800
+@@ -0,0 +1,254 @@
++/*
++ * WPA Supplicant / Configuration backend: text file
++ * Copyright (c) 2003-2012, Jouni Malinen <j@w1.fi>
++ *
++ * This software may be distributed under the terms of the BSD license.
++ * See README for more details.
++ *
++ * This file implements a configuration backend for text files. All the
++ * configuration information is stored in a text file that uses a format
++ * described in the sample configuration file, wpa_supplicant.conf.
++ */
++ 
++#include "includes.h"
++#ifdef ANDROID
++#include <sys/stat.h>
++#endif /* ANDROID */
++
++#include "common.h"
++#include "config.h"
++#include "base64.h"
++#include "uuid.h"
++#include "p2p/p2p.h"
++#include "eap_peer/eap_methods.h"
++#include "eap_peer/eap.h"
++#include "fw_env.h"
++
++static int wpa_config_validate_network(struct wpa_ssid *ssid)
++{
++	int errors = 0;
++
++	if (ssid->passphrase) {
++		if (ssid->psk_set) {
++			wpa_printf(MSG_ERROR, "both PSK and "
++				   "passphrase configured.");
++			errors++;
++		}
++		wpa_config_update_psk(ssid);
++	}
++
++	if ((ssid->group_cipher & WPA_CIPHER_CCMP) &&
++	    !(ssid->pairwise_cipher & WPA_CIPHER_CCMP) &&
++	    !(ssid->pairwise_cipher & WPA_CIPHER_NONE)) {
++		/* Group cipher cannot be stronger than the pairwise cipher. */
++		wpa_printf(MSG_DEBUG, "removed CCMP from group cipher"
++			   " list since it was not allowed for pairwise "
++			   "cipher");
++		ssid->group_cipher &= ~WPA_CIPHER_CCMP;
++	}
++
++	if (ssid->mode == WPAS_MODE_MESH &&
++	    (ssid->key_mgmt != WPA_KEY_MGMT_NONE &&
++	    ssid->key_mgmt != WPA_KEY_MGMT_SAE)) {
++		wpa_printf(MSG_ERROR,
++			   "key_mgmt for mesh network should be open or SAE");
++		errors++;
++	}
++
++	return errors;
++}
++
++
++static struct wpa_ssid * wpa_config_read_network(int id)
++{
++	struct wpa_ssid *ssid;
++	char buf[200];
++	int errors = 0;
++
++	wpa_printf(MSG_MSGDUMP, "- start of a new network block");
++	ssid = os_zalloc(sizeof(*ssid));
++	if (ssid == NULL)
++		return NULL;
++	dl_list_init(&ssid->psk_list);
++	ssid->id = id;
++
++	wpa_config_set_network_defaults(ssid);
++
++
++	fw_env_open();
++	const char *wifi_ssid = fw_env_get("wifi_ssid");
++	snprintf(buf, 34, "\"%s\"", wifi_ssid);
++	if (wpa_config_set(ssid, "ssid", buf, 0) < 0)
++		errors++;
++
++
++	const char *wifi_key = fw_env_get("wifi_key");
++	snprintf(buf, 200, "\"%s\"", wifi_key);
++	if (wpa_config_set(ssid, "psk", buf, 0) < 0)
++		errors++;
++
++
++	errors += wpa_config_validate_network(ssid);
++
++	if (errors) {
++		wpa_config_free_ssid(ssid);
++		ssid = NULL;
++	}
++
++	return ssid;
++}
++
++
++
++
++struct wpa_config * wpa_config_read_env(struct wpa_config *cfgp)
++{
++	int errors = 0;
++	struct wpa_ssid *ssid, *tail, *head;
++	struct wpa_config *config;
++	int id;
++
++	if (cfgp)
++		config = cfgp;
++	else
++		config = wpa_config_alloc_empty(NULL, NULL);
++	if (config == NULL) {
++		wpa_printf(MSG_ERROR, "Failed to allocate config file "
++			   "structure");
++		return NULL;
++	}
++
++	id = -1;
++	ssid = config->ssid;
++	while (ssid) {
++		ssid->disabled = 1;
++		if (ssid->id > id)
++			id = ssid->id;
++		ssid = ssid->next;
++	}
++	id++;
++
++	tail = head = config->ssid;
++	while (tail && tail->next)
++		tail = tail->next;
++
++	wpa_printf(MSG_DEBUG, "Reading configuration from env");
++
++	ssid = wpa_config_read_network(id);
++	if (ssid == NULL) {
++		wpa_printf(MSG_ERROR, "failed to "
++				"parse network block.");
++		errors++;
++	}
++	if (head == NULL) {
++		head = tail = ssid;
++	} else {
++		tail->next = ssid;
++		tail = ssid;
++	}
++	if (wpa_config_add_prio_network(config, ssid)) {
++		wpa_printf(MSG_ERROR, "failed to add "
++				"network block to priority list.");
++		errors++;
++	}
++
++	config->ssid = head;
++	wpa_config_debug_dump_networks(config);
++
++#ifndef WPA_IGNORE_CONFIG_ERRORS
++	if (errors) {
++		wpa_config_free(config);
++		config = NULL;
++		head = NULL;
++	}
++#endif /* WPA_IGNORE_CONFIG_ERRORS */
++
++	return config;
++}
++
++static void write_ssid(struct wpa_ssid *ssid)
++{
++	char *value = wpa_config_get(ssid, "ssid");
++	if (value == NULL)
++		return;
++	fw_env_set("wifi_ssid", value, 1);
++	os_free(value);
++}
++
++static int write_psk(struct wpa_ssid *ssid)
++{
++	int len;
++	char *value;
++
++	if (ssid->mem_only_psk)
++		return 0;
++
++	value = wpa_config_get(ssid, "psk");
++	if (value == NULL)
++		return 0;
++	fw_env_set("wifi_key", value, 1);
++	len = strlen(value);
++	os_free(value);
++	return len;
++}
++
++
++
++
++
++static void write_wep_key(struct wpa_ssid *ssid)
++{
++	char field[20], *value;
++	int res;
++
++	res = os_snprintf(field, sizeof(field), "wep_key%d", 0);
++	if (os_snprintf_error(sizeof(field), res))
++		return;
++	value = wpa_config_get(ssid, field);
++	if (value) {
++		fw_env_set("wifi_key", value, 1);
++		os_free(value);
++	}
++}
++
++
++
++
++
++static int wpa_config_write_network(struct wpa_ssid *ssid)
++{
++	write_ssid(ssid);
++
++	if(!write_psk(ssid))
++		write_wep_key(ssid);
++	
++	return 0;
++}
++
++
++
++
++
++int wpa_config_write_env(struct wpa_config *config)
++{
++	struct wpa_ssid *ssid;
++	int ret = 0;
++
++
++	wpa_printf(MSG_DEBUG, "Writing configuration to env");
++
++	for (ssid = config->ssid; ssid; ssid = ssid->next) {
++		if (ssid->key_mgmt == WPA_KEY_MGMT_WPS || ssid->temporary)
++			continue; /* do not save temporary networks */
++		if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt) && !ssid->psk_set &&
++		    !ssid->passphrase)
++			continue; /* do not save invalid network */
++		break;
++	}
++
++	ret = wpa_config_write_network(ssid);
++
++	wpa_printf(MSG_DEBUG, "Configuration env written %ssuccessfully", ret ? "un" : "");
++	return ret;
++
++}
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/config.h wpa_supplicant-2.5_1/wpa_supplicant/config.h
+--- wpa_supplicant-2.5/wpa_supplicant/config.h	2015-09-28 03:02:05.000000000 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/config.h	2021-06-22 16:47:09.849288753 +0800
+@@ -1338,5 +1338,31 @@
+  * Each configuration backend needs to implement this function.
+  */
+ int wpa_config_write(const char *name, struct wpa_config *config);
+-
++  
++/**
++ * wpa_config_read_env - Read and parse a network wifi configuration from env
++ * @cfgp: Pointer to previously allocated configuration data or %NULL if none
++ * Returns: Pointer to allocated configuration data or %NULL on failure
++ *
++ * This function reads a network wifi configuration data from env, parses its contents, and allocates
++ * data structures needed for storing configuration information. The allocated
++ * data can be freed with wpa_config_free(). if a valid network wifi configuration is readed from env, it 
++ * will disable all other wifi configration.
++ * Each configuration backend needs to implement this function.
++ */
++struct wpa_config * wpa_config_read_env(struct wpa_config *cfgp);
++ 
++/**
++ * wpa_config_write - Write or update current network wifi configuration data to env
++ * @config: Configuration data from wpa_config_read()
++ * Returns: 0 on success, -1 on failure
++ *
++ * This function write current network wifi configuration data into env 
++ * in a format that can be read with wpa_config_read_env(). This can
++ * be used to allow wpa_supplicant to update its configuration, e.g., when a
++ * new network is added or a password is changed.
++ *
++ * Each configuration backend needs to implement this function.
++ */
++int wpa_config_write_env(struct wpa_config *config);
+ #endif /* CONFIG_H */
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/main.c wpa_supplicant-2.5_1/wpa_supplicant/main.c
+--- wpa_supplicant-2.5/wpa_supplicant/main.c	2021-06-22 16:47:57.904671669 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/main.c	2021-06-22 16:47:09.849288753 +0800
+@@ -178,13 +178,16 @@
+ 
+ 	for (;;) {
+ 		c = getopt(argc, argv,
+-			   "b:Bc:C:D:de:f:g:G:hi:I:KLm:No:O:p:P:qsTtuvWw");
++			   "b:Bc:C:D:de:f:g:G:hi:I:KLm:No:O:p:P:qsTtuvWwn");
+ 		if (c < 0)
+ 			break;
+ 		switch (c) {
+ 		case 'w':
+ 			params.wps_only = 1;
+ 			break;
++		case 'n':
++			params.env_conf = 1;
++			break;
+ 		case 'b':
+ 			iface->bridge_ifname = optarg;
+ 			break;
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/Makefile wpa_supplicant-2.5_1/wpa_supplicant/Makefile
+--- wpa_supplicant-2.5/wpa_supplicant/Makefile	2021-06-22 16:47:57.904671669 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/Makefile	2021-06-22 16:47:09.833288962 +0800
+@@ -7,7 +7,7 @@
+ AR := $(CROSS_COMPILE)ar
+ LD := $(CROSS_COMPILE)ld
+ 
+-
++-include ../../../../.config
+ 
+ ifndef CFLAGS
+ CFLAGS = -MMD -O2 -Wall -g
+@@ -18,11 +18,16 @@
+ export BINDIR ?= /usr/local/sbin/
+ PKG_CONFIG ?= pkg-config
+ 
+-CFLAGS += $(EXTRA_CFLAGS)
++CFLAGS += $(EXTRA_CFLAGS) -D__LINUX__
+ CFLAGS += -I$(abspath ../src)
+ CFLAGS += -I$(abspath ../src/utils)
+ CFLAGS += -I$(abspath ../../../libnl/libnl-3.2.25/include/)
++CFLAGS += -I$(abspath ../../../../app/libovt/include/)
++
+ LDFLAGS += -L$(abspath ../../../libnl/libnl-3.2.25/lib/.libs/)
++LDFLAGS += -lovt -L$(abspath ../../../../out/$(CONFIG_PRJ)/app/libovt/libovt.so)
++LDFLAGS += -Wl,-rpath-link $(abspath ../../../../opensource/target/$(TOOLCHAIN_VER)/curl/usr/local/lib)
++
+ 
+ -include .config
+ 
+@@ -183,6 +188,7 @@
+ 
+ ifeq ($(CONFIG_BACKEND), file)
+ OBJS += config_file.o
++OBJS += config_env.o
+ ifndef CONFIG_NO_CONFIG_BLOBS
+ NEED_BASE64=y
+ endif
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/sme.h wpa_supplicant-2.5_1/wpa_supplicant/sme.h
+--- wpa_supplicant-2.5/wpa_supplicant/sme.h	2015-09-28 03:02:05.000000000 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/sme.h	2021-06-22 16:47:09.833288962 +0800
+@@ -10,7 +10,7 @@
+ #define SME_H
+ 
+ #ifdef CONFIG_SME
+-
++ 
+ void sme_authenticate(struct wpa_supplicant *wpa_s,
+ 		      struct wpa_bss *bss, struct wpa_ssid *ssid);
+ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/wpa_supplicant.c wpa_supplicant-2.5_1/wpa_supplicant/wpa_supplicant.c
+--- wpa_supplicant-2.5/wpa_supplicant/wpa_supplicant.c	2021-06-22 16:47:57.904671669 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/wpa_supplicant.c	2021-06-22 16:47:09.849288753 +0800
+@@ -4245,6 +4245,9 @@
+ 		wpa_s->confanother = os_rel2abs_path(iface->confanother);
+ 		wpa_config_read(wpa_s->confanother, wpa_s->conf);
+ 
++		if( wpa_s->global->params.env_conf )
++			wpa_config_read_env(wpa_s->conf);
++
+ 		/*
+ 		 * Override ctrl_interface and driver_param if set on command
+ 		 * line.
+@@ -4909,6 +4912,9 @@
+ 
+ 	global->params.wps_only = params->wps_only;
+ 
++	global->params.env_conf = params->env_conf;
++
++
+ 	wpa_printf(MSG_DEBUG, "wpa_supplicant v" VERSION_STR);
+ 
+ 	if (eloop_init()) {
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/wpa_supplicant_i.h wpa_supplicant-2.5_1/wpa_supplicant/wpa_supplicant_i.h
+--- wpa_supplicant-2.5/wpa_supplicant/wpa_supplicant_i.h	2021-06-22 16:47:57.904671669 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/wpa_supplicant_i.h	2021-06-22 16:47:09.833288962 +0800
+@@ -232,6 +232,10 @@
+ 	 * auto start wps_pbc, record result in evn and then exit.
+ 	 */
+ 	int wps_only;
++	/**
++	 * load wifi connect info from env.
++	 */
++	int env_conf;
+ 
+ };
+ 
+diff -Nura wpa_supplicant-2.5/wpa_supplicant/wps_supplicant.c wpa_supplicant-2.5_1/wpa_supplicant/wps_supplicant.c
+--- wpa_supplicant-2.5/wpa_supplicant/wps_supplicant.c	2021-06-22 16:47:57.904671669 +0800
++++ wpa_supplicant-2.5_1/wpa_supplicant/wps_supplicant.c	2021-06-22 16:47:09.833288962 +0800
+@@ -371,13 +371,13 @@
+ 	if ((wpa_s->conf->wps_cred_processing == 1 ||
+ 	     wpa_s->conf->wps_cred_processing == 2) && cred->cred_attr) {
+ 		size_t blen = cred->cred_attr_len * 2 + 1;
+-		char *buf = os_malloc(blen);
+-		if (buf) {
+-			wpa_snprintf_hex(buf, blen,
++		char *buf1 = os_malloc(blen);
++		if (buf1) {
++			wpa_snprintf_hex(buf1, blen,
+ 					 cred->cred_attr, cred->cred_attr_len);
+ 			wpa_msg(wpa_s, MSG_INFO, "%s%s",
+-				WPS_EVENT_CRED_RECEIVED, buf);
+-			os_free(buf);
++				WPS_EVENT_CRED_RECEIVED, buf1);
++			os_free(buf1);
+ 		}
+ 
+ 		wpas_notify_wps_credential(wpa_s, cred);
+@@ -555,10 +555,10 @@
+ 			key[0] = 0;
+ 			for (int i = 0; i < PMK_LEN; i++)
+ 			{
+-				sprintf(buf, "%02x", ssid->psk[i]);
+-				strcat(key, buf);
++				sprintf((char*)buf, "%02x", ssid->psk[i]);
++				strcat((char*)key, (char*)buf);
+ 			}
+-			printf("pmk: %s\n", key);
++			printf("pmk: %s\n", (char*)key);
+ 		}
+ 	}
+ 	ssid->priority = wpa_s->conf->wps_priority;
+@@ -567,7 +567,7 @@
+ 
+ 	wpas_wps_remove_dup_network(wpa_s, ssid);
+ 
+-	printf("<<<<<<<<<<<<<<<<%s<<<<<<<<<%s\n",ssid->ssid, ssid->passphrase?ssid->passphrase:key);
++	printf("<<<<<<<<<<<<<<<<%s<<<<<<<<<%s\n",ssid->ssid, ssid->passphrase?ssid->passphrase:(char*)key);
+ 	char cmdbuf[128];
+ 	sprintf(cmdbuf, "fw_setenv wifi_ssid %s", ssid->ssid);
+ 	system(cmdbuf);

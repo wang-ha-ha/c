@@ -1,0 +1,59 @@
+diff -Naur tinyalsa-2.0.0/src/pcm.c tinyalsa-2.0.0-m/src/pcm.c
+--- tinyalsa-2.0.0/src/pcm.c	2021-02-01 13:29:04.000000000 +0800
++++ tinyalsa-2.0.0-m/src/pcm.c	2021-08-31 14:51:44.763496970 +0800
+@@ -1404,7 +1404,8 @@
+ 
+ int pcm_state(struct pcm *pcm)
+ {
+-    int err = pcm_sync_ptr(pcm, 0);
++    int err = pcm_sync_ptr(pcm, SNDRV_PCM_SYNC_PTR_APPL);
++   // int err = pcm_sync_ptr(pcm, 0);
+     if (err < 0)
+         return err;
+ 
+diff -Naur tinyalsa-2.0.0/utils/tinycap.c tinyalsa-2.0.0-m/utils/tinycap.c
+--- tinyalsa-2.0.0/utils/tinycap.c	2021-02-01 13:29:04.000000000 +0800
++++ tinyalsa-2.0.0-m/utils/tinycap.c	2021-08-31 14:52:26.275777090 +0800
+@@ -81,12 +81,12 @@
+     struct wav_header header;
+     unsigned int card = 0;
+     unsigned int device = 0;
+-    unsigned int channels = 2;
+-    unsigned int rate = 48000;
++    unsigned int channels = 1;
++    unsigned int rate = 16000;
+     unsigned int bits = 16;
+     unsigned int frames;
+-    unsigned int period_size = 1024;
+-    unsigned int period_count = 4;
++    unsigned int period_size = 512;
++    unsigned int period_count = 2;
+     unsigned int capture_time = UINT_MAX;
+     enum pcm_format format;
+     int no_header = 0, c;
+diff -Naur tinyalsa-2.0.0/utils/tinyplay.c tinyalsa-2.0.0-m/utils/tinyplay.c
+--- tinyalsa-2.0.0/utils/tinyplay.c	2021-02-01 13:29:04.000000000 +0800
++++ tinyalsa-2.0.0-m/utils/tinyplay.c	2021-08-31 14:52:37.715857684 +0800
+@@ -53,10 +53,10 @@
+     cmd->card = 0;
+     cmd->device = 0;
+     cmd->flags = PCM_OUT;
+-    cmd->config.period_size = 1024;
++    cmd->config.period_size = 512;
+     cmd->config.period_count = 2;
+-    cmd->config.channels = 2;
+-    cmd->config.rate = 48000;
++    cmd->config.channels = 1;
++    cmd->config.rate = 16000;
+     cmd->config.format = PCM_FORMAT_S16_LE;
+     cmd->config.silence_threshold = cmd->config.period_size * cmd->config.period_count;
+     cmd->config.silence_size = 0;
+@@ -323,7 +323,7 @@
+ 
+     cmd.config.silence_threshold = cmd.config.period_size * cmd.config.period_count;
+     cmd.config.stop_threshold = cmd.config.period_size * cmd.config.period_count;
+-    cmd.config.start_threshold = cmd.config.period_size;
++    cmd.config.start_threshold = 2*cmd.config.period_size;
+ 
+     if (ctx_init(&ctx, &cmd) < 0) {
+         return EXIT_FAILURE;

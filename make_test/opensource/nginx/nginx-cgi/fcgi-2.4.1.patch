@@ -1,0 +1,11 @@
+diff -Nura fcgi-2.4.1-SNAP-0910052249/libfcgi/fcgio.cpp fcgi-2.4.1-SNAP-0910052249_new/libfcgi/fcgio.cpp
+--- fcgi-2.4.1-SNAP-0910052249/libfcgi/fcgio.cpp	2003-06-22 08:51:27.000000000 +0800
++++ fcgi-2.4.1-SNAP-0910052249_new/libfcgi/fcgio.cpp	2022-02-09 16:42:16.991247835 +0800
+@@ -22,6 +22,7 @@
+ #define DLLAPI  __declspec(dllexport)
+ #endif
+ 
++#include <stdio.h>
+ #include <limits.h>
+ #include "fcgio.h"
+ 

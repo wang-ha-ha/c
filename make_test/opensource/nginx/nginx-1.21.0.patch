@@ -1,0 +1,79 @@
+diff -Nura nginx-1.21.0/auto/feature nginx-1.21.0_new/auto/feature
+--- nginx-1.21.0/auto/feature	2021-05-25 20:28:56.000000000 +0800
++++ nginx-1.21.0_new/auto/feature	2022-02-11 11:45:02.825806384 +0800
+@@ -46,6 +46,9 @@
+ 
+ eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
+ 
++if [ "$ngx_feature_run" = "yes" ]; then
++	ngx_feature_run=no
++fi
+ 
+ if [ -x $NGX_AUTOTEST ]; then
+ 
+diff -Nura nginx-1.21.0/auto/lib/openssl/conf nginx-1.21.0_new/auto/lib/openssl/conf
+--- nginx-1.21.0/auto/lib/openssl/conf	2021-05-25 20:28:56.000000000 +0800
++++ nginx-1.21.0_new/auto/lib/openssl/conf	2022-02-11 11:45:02.825806384 +0800
+@@ -59,8 +59,8 @@
+         ngx_feature_name="NGX_OPENSSL"
+         ngx_feature_run=no
+         ngx_feature_incs="#include <openssl/ssl.h>"
+-        ngx_feature_path=
+-        ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
++        ngx_feature_path="../../target/arm-ov-linux-20210322/openssl/include"
++        ngx_feature_libs="-L../../target/arm-ov-linux-20210322/openssl/lib/ -lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
+         ngx_feature_test="SSL_CTX_set_options(NULL, 0)"
+         . auto/feature
+ 
+diff -Nura nginx-1.21.0/auto/lib/pcre/conf nginx-1.21.0_new/auto/lib/pcre/conf
+--- nginx-1.21.0/auto/lib/pcre/conf	2021-05-25 20:28:56.000000000 +0800
++++ nginx-1.21.0_new/auto/lib/pcre/conf	2022-02-11 11:44:01.662509722 +0800
+@@ -101,8 +101,8 @@
+         ngx_feature_name="NGX_PCRE"
+         ngx_feature_run=no
+         ngx_feature_incs="#include <pcre.h>"
+-        ngx_feature_path=
+-        ngx_feature_libs="-lpcre"
++        ngx_feature_path="../pcre/pcre-8.45/"
++        ngx_feature_libs="-L../pcre/pcre-8.45/.libs -lpcre"
+         ngx_feature_test="pcre *re;
+                           re = pcre_compile(NULL, 0, NULL, 0, NULL);
+                           if (re == NULL) return 1"
+diff -Nura nginx-1.21.0/auto/types/sizeof nginx-1.21.0_new/auto/types/sizeof
+--- nginx-1.21.0/auto/types/sizeof	2021-05-25 20:28:56.000000000 +0800
++++ nginx-1.21.0_new/auto/types/sizeof	2022-02-11 11:45:02.825806384 +0800
+@@ -40,7 +40,33 @@
+ 
+ 
+ if [ -x $NGX_AUTOTEST ]; then
+-    ngx_size=`$NGX_AUTOTEST`
++#    ngx_size=`$NGX_AUTOTEST`
++     if [ "$ngx_type" = "int" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "long" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "long long" ]; then
++         ngx_size=8
++     fi
++     if [ "$ngx_type" = "void *" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "size_t" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "off_t" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "time_t" ]; then
++         ngx_size=4
++     fi
++     if [ "$ngx_type" = "sig_atomic_t" ]; then
++         ngx_size=4
++     fi
++
++
+     echo " $ngx_size bytes"
+ fi
+ 

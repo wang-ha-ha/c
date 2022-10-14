@@ -1,0 +1,68 @@
+diff -Nura hostapd-2.9/hostapd/config_file.c hostapd-2.9_new/hostapd/config_file.c
+--- hostapd-2.9/hostapd/config_file.c	2019-08-07 21:25:25.000000000 +0800
++++ hostapd-2.9_new/hostapd/config_file.c	2021-08-04 14:27:24.320916984 +0800
+@@ -2378,7 +2378,9 @@
+ 		os_strlcpy(bss->vlan_bridge, pos, sizeof(bss->vlan_bridge));
+ 	} else if (os_strcmp(buf, "wds_bridge") == 0) {
+ 		os_strlcpy(bss->wds_bridge, pos, sizeof(bss->wds_bridge));
+-	} else if (os_strcmp(buf, "driver") == 0) {
++	} else  if (os_strcmp(buf, "force_40mhz") == 0) {
++		conf->force_40mhz = atoi(pos);
++    }else if (os_strcmp(buf, "driver") == 0) {
+ 		int j;
+ 		const struct wpa_driver_ops *driver = NULL;
+ 
+diff -Nura hostapd-2.9/src/ap/ap_config.c hostapd-2.9_new/src/ap/ap_config.c
+--- hostapd-2.9/src/ap/ap_config.c	2019-08-07 21:25:25.000000000 +0800
++++ hostapd-2.9_new/src/ap/ap_config.c	2021-08-04 14:28:09.074173589 +0800
+@@ -259,6 +259,8 @@
+ 	conf->rssi_reject_assoc_rssi = 0;
+ 	conf->rssi_reject_assoc_timeout = 30;
+ 
++	conf->force_40mhz = 0;
++
+ #ifdef CONFIG_AIRTIME_POLICY
+ 	conf->airtime_update_interval = AIRTIME_DEFAULT_UPDATE_INTERVAL;
+ #endif /* CONFIG_AIRTIME_POLICY */
+diff -Nura hostapd-2.9/src/ap/ap_config.h hostapd-2.9_new/src/ap/ap_config.h
+--- hostapd-2.9/src/ap/ap_config.h	2019-08-07 21:25:25.000000000 +0800
++++ hostapd-2.9_new/src/ap/ap_config.h	2021-08-04 14:28:16.404141632 +0800
+@@ -909,6 +909,8 @@
+ 
+ 	int ieee80211h; /* DFS */
+ 
++	int force_40mhz; // force to 40MHz
++
+ 	/*
+ 	 * Local power constraint is an octet encoded as an unsigned integer in
+ 	 * units of decibels. Invalid value -1 indicates that Power Constraint
+diff -Nura hostapd-2.9/src/ap/hw_features.c hostapd-2.9_new/src/ap/hw_features.c
+--- hostapd-2.9/src/ap/hw_features.c	2019-08-07 21:25:25.000000000 +0800
++++ hostapd-2.9_new/src/ap/hw_features.c	2021-08-04 14:28:25.189805005 +0800
+@@ -309,6 +309,12 @@
+ 		oper40 = ieee80211n_check_40mhz_2g4(iface, scan_res);
+ 	wpa_scan_results_free(scan_res);
+ 
++
++    if (!oper40 && iface->conf->force_40mhz) {
++        wpa_printf(MSG_INFO, "But will force to 40MHz due to force_40mhz.");
++        oper40 = 1;
++    }
++
+ 	iface->secondary_ch = iface->conf->secondary_channel;
+ 	if (!oper40) {
+ 		wpa_printf(MSG_INFO, "20/40 MHz operation not permitted on "
+diff -Nura hostapd-2.9/src/ap/ieee802_11_ht.c hostapd-2.9_new/src/ap/ieee802_11_ht.c
+--- hostapd-2.9/src/ap/ieee802_11_ht.c	2019-08-07 21:25:25.000000000 +0800
++++ hostapd-2.9_new/src/ap/ieee802_11_ht.c	2021-08-04 14:28:31.445158643 +0800
+@@ -258,6 +258,10 @@
+ 		return;
+ 	}
+ 
++    if (iface->conf->force_40mhz){
++		return;
++	}
++
+ 	/* 20/40 BSS Coexistence element */
+ 	bc_ie = (struct ieee80211_2040_bss_coex_ie *) data;
+ 	if (bc_ie->element_id != WLAN_EID_20_40_BSS_COEXISTENCE ||

@@ -1,0 +1,9 @@
+--- 0/include/config.h	2022-05-18 16:24:47.533707626 +0800
++++ 1/include/config.h	2022-05-18 16:21:34.781475908 +0800
+@@ -660,3 +660,6 @@
+ /* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+    `char[]'. */
+ #define YYTEXT_POINTER 1
++
++typedef unsigned int __u32;
++typedef signed int __s32;

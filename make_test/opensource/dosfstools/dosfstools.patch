@@ -1,0 +1,12 @@
+diff -r -u 0/src/fsck.fat.c 1/src/fsck.fat.c
+--- 0/src/fsck.fat.c	2019-06-23 03:01:48.000000000 -0700
++++ 1/src/fsck.fat.c	2019-08-28 10:10:05.284825686 -0700
+@@ -130,7 +130,7 @@
+ 	case 'y':
+ 	    rw = 1;
+ 	    interactive = 0;
+-	    salvage_files = 1;
++	    salvage_files = 0;
+ 	    break;
+ 	case 'b':
+ 	    rw = 0;
