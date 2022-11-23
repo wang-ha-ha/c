@@ -1,0 +1,16 @@
+*.o 
+*~ 
+.depend 
+.*.cmd  
+*.mod.c 
+.tmp_versions 
+*.ko 
+*.symvers 
+modules.order
+hello/
+modules
+
+env/tools/env.bin
+env/tools/fw_genenv
+env/tools/fw_setenv
+env/tools/fw_printenv

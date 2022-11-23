@@ -1,0 +1,18 @@
+# 测试env.bin生成
+test=test1
+test1=test2
+test2=test3
+t=1
+# aaa= b
+ #bbb=c
+  a = 1
+a = 2
+b= 3
+
+[aaa]
+
+c =1
+
+
+d =    
+e=    
