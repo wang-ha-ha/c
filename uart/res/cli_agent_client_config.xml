@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cli xmlns="http://alexis.royer.free.fr/CLI" name="">
+    <cpp option="include">#include "cli/ui_password.h"</cpp>
+    <cpp option="include">#include "iostream"</cpp>
+    <cpp option="include">#include "cli_agent_api.hpp"</cpp>
+    <cpp option="include">#include "cli_agent_common.hpp"</cpp>
+
+    <keyword string="enter_sleep">
+        <help lang="en">Enter sleep status</help>
+        <endl>
+        <cpp>EnterSleepState(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="wifi_cmd">
+        <help lang="en">wifi_cmd</help>
+        <param type="string" id="AT">
+            <endl>
+                <cpp>WIFICMD(<out/>, <value-of param="AT"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="set_sn">
+        <help lang="en">set PCB SN</help>
+        <param type="string" id="sn">
+            <endl>
+                <cpp>SetSN(<out/>, <value-of param="sn"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="get_sn">
+        <help lang="en">get PCB SN</help>
+            <endl>
+                <cpp>GetSN(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="get_mac">
+        <help lang="en">get MAC</help>
+            <endl>
+                <cpp>GetMAC(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="set_mac">
+        <help lang="en">set DID</help>
+        <param type="string" id="mac">
+            <endl>
+                <cpp>SetMAC(<out/>, <value-of param="mac"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="get_version">
+        <help lang="en">get system version</help>
+            <endl>
+                <cpp>GetSYSVerion(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="gen_oob">
+        <help lang="en">get did</help>
+            <endl>
+                <cpp>GenOOB(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="set_did">
+        <help lang="en">set DID</help>
+        <param type="string" id="did">
+            <endl>
+                <cpp>SetDID(<out/>, <value-of param="did"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="get_did">
+        <help lang="en">get did</help>
+            <endl>
+                <cpp>GetDID(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="fac_reset">
+        <help lang="en">factory reset , not support now</help>
+            <endl>
+                <cpp>FactoryReset(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="get_qr_code">
+        <help lang="en">get QR code</help>
+            <endl>
+                <cpp>GetQRCode(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+        <keyword string="set_key">
+            <help lang="en">set key</help>
+            <param type="string" id="key">
+                <endl>
+                    <cpp>SetKey(<out/>, <value-of param="key"/>);</cpp>
+                </endl>
+            </param>
+        </keyword>
+
+        <keyword string="get_key">
+            <help lang="en">get key</help>
+                <endl>
+                    <cpp>GetKey(<out/>);</cpp>
+                </endl>
+        </keyword>
+
+    <keyword string="cam_start">
+        <help lang="en">start camer test, save file to sdcard</help>
+            <endl>
+                <cpp>CamStart(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="cam_stop">
+        <help lang="en">stop camer test</help>
+            <endl>
+                <cpp>CamStop(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="mic_start">
+        <help lang="en">start microphone test</help>
+            <endl>
+                <cpp>MICSart(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="mic_spk_test">
+        <help lang="en">mic_spk_test</help>
+            <endl>
+                <cpp>MICSpkTest(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="mic_spk_aec">
+        <help lang="en">mic_spk_aec</help>
+            <endl>
+                <cpp>MICSpkAec(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="get_mic_file">
+        <help lang="en">upload mic file</help>
+            <endl>
+                <cpp>MICFileUpload(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="mic_stop">
+        <help lang="en">stop microphone test</help>
+            <endl>
+                <cpp>MICStop(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="spk_start">
+        <help lang="en">start speak test</help>
+            <endl>
+                <cpp>SPKStart(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="speak_stop">
+        <help lang="en">stop speak test</help>
+            <endl>
+                <cpp>SPKStop(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="light_sensor_start">
+        <help lang="en">start light sensor test</help>
+            <endl>
+                <cpp>LightSensorStart(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="g_sensor_start">
+        <help lang="en">start Gravity acceleration sensor</help>
+            <endl>
+                <cpp>GravitySensorStart(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="wled_start">
+        <help lang="en">open white LED</help>
+            <endl>
+                <cpp>WledStart(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="wled_stop">
+        <help lang="en">close white LED</help>
+            <endl>
+                <cpp>WledStop(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="irled_start">
+        <help lang="en">open infrared LED</help>
+            <endl>
+                <cpp>IRledStart(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+    <keyword string="irled_stop">
+        <help lang="en">close infrared LED</help>
+            <endl>
+                <cpp>IRledStop(<out/>);</cpp>
+        </endl>
+    </keyword>
+
+
+    <keyword string="rgb_led_set">
+        <help lang="en">set 616 rgb led with(r y b o, red yellow blue off)</help>
+        <param type="string" id="colour">
+            <endl>
+                <cpp>RGBLEDSet(<out/>, <value-of param="colour"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="obj_pir_start">
+        <help lang="en">to receive obj recognise</help>
+        <help lang="en">max wait time</help>
+            <endl>
+                <cpp>OBJPirSart(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="obj_pir_stop">
+        <help lang="en">stop receive</help>
+            <endl>
+                <cpp>OBJPirStop(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="get_battery">
+        <help lang="en">get battery info</help>
+            <endl>
+                <cpp>GetBattery(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="start_button_test">
+        <help lang="en">press any button</help>
+            <endl>
+                <cpp>ButtonClick(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+	<keyword string="save_info">
+        <help lang="en">demo(save_info key value)</help>
+        <param type="string" id="mkey">
+        <param type="string" id="mvalue">
+                    <endl>
+                    <cpp>SaveInfo(<out/>, <value-of param="mkey"/>, <value-of param="mvalue"/>);</cpp>
+                </endl>
+        </param>
+        </param>
+    </keyword>
+
+    <keyword string="get_info">
+        <help lang="en">demo(get_info key)</help>
+        <param type="string" id="mkey">
+            <endl>
+                <cpp>GetInfo(<out/>, <value-of param="mkey"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+    <keyword string="led(0x04)">
+        <help lang="en">led config</help>
+        <param type="int" id="iCmdCode">
+        <help lang="en">0: off 1: on 2: breathing 3:waterfall</help>
+        <param type="int" id="iBright">
+        <help lang="en">0~255</help>
+        <param type="int" id="iRGB">
+        <help lang="en">0 : all 1: Red 2:Green 4: blue</help>
+            <endl>
+            <cpp>LEDConfig(<out/>, <value-of param="iCmdCode"/>, <value-of param="iBright"/>, <value-of param="iRGB"/>);</cpp>
+            </endl>
+        </param>
+        </param>
+        </param>
+    </keyword>
+
+    <keyword string="upgrade">
+        <help lang="en">MCUUPGRADE</help>
+            <endl>
+                <cpp>MCUUpgrade(<out/>);</cpp>
+            </endl>
+    </keyword>
+
+    <keyword string="mcutest">
+        <help lang="en">MCUTest</help>
+        <param type="int" id="iCmdCode">
+        <help lang="en">iCmdCode</help>
+            <endl>
+                <cpp>MCUTest(<out/>,<value-of param="iCmdCode"/>);</cpp>
+            </endl>
+        </param>
+    </keyword>
+
+</cli>

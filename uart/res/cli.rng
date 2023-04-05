@@ -1,0 +1,640 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+    Copyright (c) 2006-2018, Alexis Royer, http://alexis.royer.free.fr/CLI
+
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+        * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation
+          and/or other materials provided with the distribution.
+        * Neither the name of the CLI library project nor the names of its contributors may be used to endorse or promote products derived from this software
+          without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+<rng:grammar xmlns:rng="http://relaxng.org/ns/structure/1.0"
+            xmlns:doc="http://relaxng.org/ns/compatibility/annotations/1.0"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            ns="http://alexis.royer.free.fr/CLI">
+
+    <!-- Main node. -->
+    <rng:start>
+        <doc:documentation xml:lang="en">
+            A CLI XML resource file starts with a 'cli' element.
+        </doc:documentation>
+
+        <rng:ref name="T_Cli"/>
+    </rng:start>
+
+    <!-- CLI definition. The main node defines the main menu. -->
+    <rng:define name="T_Cli">
+        <rng:element name="cli">
+            <doc:documentation xml:lang="en">
+                The 'cli' element basically works like a menu element:
+                it directly contains 'keyword' and 'tag' elements which start commands lines, and handler elements.
+                It may also contains 'menu' elements for each sub-menu description at the top location (and not "in-place").
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="name">
+                <doc:documentation xml:lang="en">
+                    The '@name' attribute describes the name of the cli, which is the also the main menu.
+                    It is both a resource name and an identifier.
+                    Menu names are unique.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+            <rng:optional>
+                <rng:attribute name="cpp">
+                    <doc:documentation xml:lang="en">
+                        The '@cpp' attribute allows you to indicate to name of a global C++ pointer variable, which points to the CLI instance when it is statically generated.
+                        It tends to be deprecated since smarter way of integration have been designed.
+                        Please refer to the user manual for further information.
+                    </doc:documentation>
+                    <rng:text/>
+                </rng:attribute>
+            </rng:optional>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:zeroOrMore><rng:ref name="T_Comment"/></rng:zeroOrMore>
+                <rng:ref name="G_MenuContent"/>
+                <rng:zeroOrMore><rng:ref name="T_Menu"/></rng:zeroOrMore>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+
+    <!-- Menu node. -->
+    <rng:define name="T_Menu">
+        <rng:element name="menu">
+            <doc:documentation xml:lang="en">
+                'menu[@name]' elements describe a menu.
+                Menus provide sets of command lines.
+                When the CLI starts, the CLI main menu is active, then the CLI enters and quits sub-menus on a LIFO principle.
+                Sub-menus can be referenced thanks to 'menu' elements placed in 'endl' elements.
+                A CLI menu automatically provides regular command lines like 'help', 'pwm', 'exit' and 'quit'.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="name">
+                <doc:documentation xml:lang="en">
+                    The '@name' attribute describes the name of the menu.
+                    It is both a resource name and an identifier.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:ref name="G_MenuContent"/>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+    <!-- Menu reference node. -->
+    <rng:define name="T_MenuRef">
+        <rng:element name="menu">
+            <doc:documentation xml:lang="en">
+                'menu[@ref]' elements describe references to 'menu[@name]' elements.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="ref">
+                <doc:documentation xml:lang="en">
+                    The '@ref' attribute references the name of menu previously declared,
+                    either by a 'menu[@name]' or the main 'cli' element.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+        </rng:element>
+    </rng:define>
+
+    <!-- Comment node. -->
+    <rng:define name="T_Comment">
+        <rng:element name="comment">
+            <doc:documentation xml:lang="en">
+                'comment' nodes declare patterns for comment lines definition.
+                They may be declared within the 'cli' element only.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="start">
+                <doc:documentation xml:lang="en">
+                    Only starter patterns are managed for the moment.
+                    They have been defined through a '@start' attribute for future evolution concerns, in case we would like to add a '@end' as well.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+        </rng:element>
+    </rng:define>
+
+    <!-- Keyword node. -->
+    <rng:define name="T_Keyword">
+        <rng:element name="keyword">
+            <doc:documentation xml:lang="en">
+                Keywords are the base of command lines.
+                A sequence of keywords (and optionally parameters) terminated by a 'endl' element constitute a command line.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="string">
+                <doc:documentation xml:lang="en">
+                    The '@string' attribute describe the keyword string itself.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:ref name="G_SyntaxNodeContent"/>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+
+    <!-- Parameter node. -->
+    <rng:define name="T_Param">
+        <rng:element name="param">
+            <doc:documentation xml:lang="en">
+                Parameters may be used within a keyword sequence, in order to let the user enter variable values.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="id">
+                <doc:documentation xml:lang="en">
+                    The '@id' attribute gives a name to the parameter.
+                    This identifier may be displayed in command line helps, either at run time or in documentation generation.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+            <rng:attribute name="type">
+                <doc:documentation xml:lang="en">
+                    The '@type' attribute indicates which one of the types available this parameter is a kind of:
+                        - string: Basic string value. No particular constraint (eg 'hello'),
+                        - int: Integer value (eg '1'),
+                        - float: Float value (eg '1.5'),
+                        - host: Host name, network address (eg: '192.168.1.1').
+                </doc:documentation>
+                <rng:choice>
+                    <rng:value>string</rng:value>
+                    <rng:value>int</rng:value>
+                    <rng:value>float</rng:value>
+                    <rng:value>host</rng:value>
+                </rng:choice>
+            </rng:attribute>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:ref name="G_SyntaxNodeContent"/>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+    <!-- Parameter reference node. -->
+    <rng:define name="T_ParamRef">
+        <rng:element name="value-of">
+            <doc:documentation xml:lang="en">
+                Parameters references may be used within native code elements.
+                Use them just as if you were using a native code value.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="param">
+                <doc:documentation xml:lang="en">
+                    The '@param' attribute references a parameter identifier previously declared in a '@id' attribute of a 'param' element.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+        </rng:element>
+    </rng:define>
+
+    <!-- Tag node. -->
+    <rng:define name="T_Tag">
+        <rng:element name="tag">
+            <doc:documentation xml:lang="en">
+                'tag' elements allow you to implement jumps in the CLI syntax tree.
+                'tag[@ref]' elements reference 'tag[@id]' elements, indicating a possible jump from 'tag[@ref]' to 'tag[@id]'.
+                Basically, these jumps can be used to implement optional parts a command line.
+                These jumps may be backward jumps, in order to implement patterns like 'a[b][c][d]',
+                or forward jumps, in order to implement patterns like 'a(b|c)d'.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="id">
+                <doc:documentation xml:lang="en">
+                    The '@id' attribute describes the identifier of the tag.
+                    Tag identifiers are unique.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+            <rng:optional>
+                <rng:attribute name="hollow">
+                    <doc:documentation xml:lang="en">
+                        The '@hollow' attribute indicates whether the tag child elements are directly visible from its parent element or not.
+
+                        When the tag is a hollow tag, its children elements are not visible from the parent element.
+                        The tag must be referenced so that its content can be reached.
+                        This kind of tag is usually used in order to implement forward jumps.
+
+                        By default, when the tag is not a hollow tag, its children elements are directly visible from the parent element.
+                        The tag may also be referenced so that its content can be reached from other locations of the CLI syntax tree.
+                        This kind of tag is usually used in order to implement backward jumps.
+                    </doc:documentation>
+                    <rng:choice>
+                        <rng:value>yes</rng:value>
+                        <rng:value>no</rng:value>
+                    </rng:choice>
+                </rng:attribute>
+            </rng:optional>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:ref name="G_SyntaxNodeContent"/>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+    <!-- Tag reference node. -->
+    <rng:define name="T_TagRef">
+        <rng:element name="tag">
+            <doc:documentation xml:lang="en">
+                'tag[@ref]' elements reference 'tag[@id]' elements.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="ref">
+                <doc:documentation xml:lang="en">
+                    The '@ref' attribute references the identifier of a 'tag[@id]' declared somewhere else.
+                </doc:documentation>
+                <rng:text/>
+            </rng:attribute>
+            <rng:optional>
+                <rng:attribute name="max">
+                    <doc:documentation xml:lang="en">
+                        The '@max' attribute indicates the maximum number of times this jump in the CLI syntax tree can be used for one command line.
+                        It is useful when implementing a backward tag.
+
+                        When the '@max' attribute is '1', it basically implements a non repeatable optional part of a command line.
+                        When the '@max' attribute is 'unbounded', it indicates that the optional part of the command line may be repeated.
+                    </doc:documentation>
+                    <rng:choice>
+                        <rng:value>1</rng:value>
+                        <rng:value>unbounded</rng:value>
+                    </rng:choice>
+                </rng:attribute>
+            </rng:optional>
+        </rng:element>
+    </rng:define>
+
+    <!-- End of line node. -->
+    <rng:define name="T_Endl">
+        <rng:element name="endl">
+            <doc:documentation xml:lang="en">
+                'endl' (end of line) elements terminate a command line.
+                They basically contain native code in order to execute the action described by the command line,
+                implemented in the rest of the native application.
+                They may also lead to sub-menus.-->
+            </doc:documentation>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_Help"/>
+                <rng:ref name="G_NativeCode"/>
+                <rng:optional><rng:choice>
+                    <rng:ref name="T_Menu"/>
+                    <rng:ref name="T_MenuRef"/>
+                </rng:choice></rng:optional>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+
+    <!-- Native code nodes. -->
+    <rng:define name="T_Handler">
+        <rng:element name="handler">
+            <doc:documentation xml:lang="en">
+                Handler sections allow you to trigger native on certain events.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:attribute name="name">
+                <doc:documentation xml:lang="en">
+                    The '@name' attribute specifies which kind of handler is triggered:
+                        - error: trigger native code when an error occurs,
+                        - exit: trigger native code when the menu exits,
+                        - prompt: modify the prompt displayed for the menu, depending on the context (the code attached must return a string).
+                </doc:documentation>
+                <rng:choice>
+                    <rng:value>error</rng:value>
+                    <rng:value>exit</rng:value>
+                    <rng:value>prompt</rng:value>
+                </rng:choice>
+            </rng:attribute>
+
+            <!-- Content -->
+            <rng:interleave>
+                <rng:ref name="G_NativeCode"/>
+            </rng:interleave>
+        </rng:element>
+    </rng:define>
+    <rng:define name="T_NativeCppCode">
+        <rng:element name="cpp">
+            <doc:documentation xml:lang="en">
+                C++ native code.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:optional>
+                <rng:attribute name="option">
+                    <doc:documentation xml:lang="en">
+                        The '@option' attribute may be used in order to place native code in extra sections:
+                            - head:         Extra section which can be used in order to place code at the top of the native code file generated (before includes).
+                            - include:      A C++ extra section called 'include' allows the insertion of native code right after the CLI library includes.
+                                            Basically '#include "..."' pieces of code.
+                            - types:        The 'types' section is deprecated.
+                                            It is placed right after the 'include' section.
+                                            Prefer either types definition throughout a specific include file,
+                                            or inner type declarations directly within the context of a menu with the 'members' section.
+                            - vars:         The 'vars' section is deprecated.
+                                            It is placed right after the 'types' section.
+                                            Prefer 'members' and 'constructor' sections for persistent variable declarations and initializations.
+                            - members:      Within the context of a menu, the 'members' section alloww you declare variables in the context of this menu.
+                            - constructor:  Within the context of a menu, the 'constructor' section allows you to execute native code at the initialization of that menu.
+                                            It basically permits the initialization of member variables declared with in the 'members' section.
+                            - body:         The 'body' section is deprecated.
+                                            It is placed right before the 'tail' section.
+                                            Prefer 'tail' section.
+                            - tail:         Add native code after any CLI code generated, at the very end of the file.
+                    </doc:documentation>
+                    <rng:choice>
+                        <rng:value>head</rng:value>
+                        <rng:value>include</rng:value>
+                        <rng:value>types</rng:value>
+                        <rng:value>vars</rng:value>
+                        <rng:value>members</rng:value>
+                        <rng:value>constructor</rng:value>
+                        <rng:value>body</rng:value>
+                        <rng:value>tail</rng:value>
+                    </rng:choice>
+                </rng:attribute>
+            </rng:optional>
+
+            <!-- Content -->
+            <rng:ref name="G_NativeCodeContent"/>
+        </rng:element>
+    </rng:define>
+    <rng:define name="T_NativeJavaCode">
+        <rng:element name="java">
+            <doc:documentation xml:lang="en">
+                Java native code.
+            </doc:documentation>
+
+            <!-- Attributes -->
+            <rng:optional>
+                <rng:attribute name="option">
+                    <doc:documentation xml:lang="en">
+                        The '@option' attribute may be used in order to place native code in extra sections:
+                            - head:         Extra section which can be used in order to place code at the top of the native code file generated (before imports).
+                            - import:       A Java extra section called 'import' allows the insertion of native code right after the CLI library imports.
+                                            Basically 'import "..."' pieces of code.
+                            - members:      Within the context of a menu, the 'members' section alloww you declare variables in the context of this menu.
+                            - constructor:  Within the context of a menu, the 'constructor' section allows you to execute native code at the initialization of that menu.
+                                            It basically permits the initialization of member variables declared with in the 'members' section.
+                            - tail:         Add native code after any CLI code generated, at the very end of the file.
+                    </doc:documentation>
+                    <rng:choice>
+                        <rng:value>head</rng:value>
+                        <rng:value>import</rng:value>
+                        <rng:value>members</rng:value>
+                        <rng:value>constructor</rng:value>
+                        <rng:value>tail</rng:value>
+                    </rng:choice>
+                </rng:attribute>
+            </rng:optional>
+
+            <!-- Content -->
+            <rng:ref name="G_NativeCodeContent"/>
+        </rng:element>
+    </rng:define>
+
+    <!-- Help node. -->
+    <rng:define name="T_Help">
+        <rng:element name="help">
+            <doc:documentation xml:lang="en">
+                'help' elements allow you to attach help for every significant CLI element: 'menu', 'keyword', 'param', 'endl'.
+                You may attach as many 'help' elements to a node for each language you want to manage.
+                This help is automatically displayed by the shell at run time, and is also used by the documentation generation stylesheet.
+            </doc:documentation>
+
+            <rng:attribute name="lang">
+                <doc:documentation xml:lang="en">
+                    The '@lang' attribute describes the language of the help resource:
+                        - en: English language,
+                        - fr: French language.
+                </doc:documentation>
+                <rng:choice>
+                    <rng:value>en</rng:value>
+                    <rng:value>fr</rng:value>
+                </rng:choice>
+            </rng:attribute>
+            <rng:text/>
+        </rng:element>
+    </rng:define>
+
+    <!-- Groups of content. -->
+    <rng:define name="G_Help">
+        <doc:documentation xml:lang="en">
+            This group describes the sequence of 'help' elements you may attach to a CLI element.
+        </doc:documentation>
+
+        <rng:interleave>
+            <rng:zeroOrMore>
+                <rng:ref name="T_Help">
+                    <doc:documentation xml:lang="en">
+                        Provide as much help as you can, for every language you manage.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+        </rng:interleave>
+    </rng:define>
+    <rng:define name="G_NativeCode">
+        <doc:documentation xml:lang="en">
+            This group describes the way you may attach native code to a CLI element.
+        </doc:documentation>
+
+        <rng:interleave>
+            <rng:zeroOrMore>
+                <rng:ref name="T_NativeCppCode">
+                    <doc:documentation xml:lang="en">
+                        Attach C++ native code.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+            <rng:zeroOrMore>
+                <rng:ref name="T_NativeJavaCode">
+                    <doc:documentation xml:lang="en">
+                        Attach Java native code.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+        </rng:interleave>
+    </rng:define>
+    <rng:define name="G_NativeCodeContent">
+        <doc:documentation xml:lang="en">
+            A native code element has a mixed content.
+            It contains text which directly correspond to native code,
+            and special elements that make the link between the CLI elements and the native code.
+        </doc:documentation>
+
+        <!-- Mixed content -->
+        <rng:interleave>
+            <rng:zeroOrMore><rng:text/></rng:zeroOrMore>
+            <rng:zeroOrMore>
+                <rng:element name="out">
+                    <doc:documentation xml:lang="en">
+                        The 'out' element represents the regular output stream.
+
+                        Use it instead of printf() or std::cout in C++, or System.out in Java, in order to benefit from the generic input / output device principle.
+                        This way, you can control where all outputs should be directed, depending on the output device you make the shell running with:
+                            - either a regular console device,
+                            - a telnet device for remote access,
+                            - a file device for logging,
+                            - even a null device to turn the outputs off
+                            - ...
+
+                        Use it as would use std::cout in c++, with the &lt;&lt; operator.
+                            eg: &lt;out/&gt; &lt;&lt; "hello" &lt;&lt; cli::endl;
+                        Use it as an object with put() and endl() methods in Java.
+                            eg: &lt;out/&gt;.put("hello").endl();
+                    </doc:documentation>
+                    <rng:empty/>
+                </rng:element>
+            </rng:zeroOrMore>
+            <rng:zeroOrMore>
+                <rng:element name="err">
+                    <doc:documentation xml:lang="en">
+                        Same as 'out' element, but for the error output stream.
+                    </doc:documentation>
+                    <rng:empty/>
+                </rng:element>
+            </rng:zeroOrMore>
+            <rng:zeroOrMore>
+                <rng:ref name="T_ParamRef">
+                    <doc:documentation xml:lang="en">
+                        The 'value-of' element allows you to use the values given by the user for each 'param' element within a command line.
+                        Use it as you would use a variable in the native code.
+                            eg: int a = &lt;value-of param="my-param"/&gt;;
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+        </rng:interleave>
+    </rng:define>
+    <rng:define name="G_MenuContent">
+        <doc:documentation xml:lang="en">
+            This group describes the content of menu elements (either 'cli' or 'menu[@name]').
+        </doc:documentation>
+
+        <rng:interleave>
+            <rng:ref name="G_NativeCode">
+                <doc:documentation xml:lang="en">
+                    Native code may be inserted at the top location of a menu, in order to have code being executed before any command analysis.
+                </doc:documentation>
+            </rng:ref>
+            <rng:zeroOrMore>
+                <rng:ref name="T_Keyword">
+                    <doc:documentation xml:lang="en">
+                        Start command lines with keywords.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+            <rng:mixed>
+                <rng:zeroOrMore>
+                    <rng:ref name="T_Tag">
+                        <doc:documentation xml:lang="en">
+                            Start new tags.
+                        </doc:documentation>
+                    </rng:ref>
+                </rng:zeroOrMore>
+                <rng:zeroOrMore>
+                    <rng:ref name="T_TagRef">
+                        <doc:documentation xml:lang="en">
+                            Make jumps within the syntax tree.
+                        </doc:documentation>
+                    </rng:ref>
+                </rng:zeroOrMore>
+            </rng:mixed>
+            <rng:zeroOrMore>
+                <rng:ref name="T_Handler">
+                    <doc:documentation xml:lang="en">
+                        Trigger native code to handlers.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+        </rng:interleave>
+    </rng:define>
+    <rng:define name="G_SyntaxNodeContent">
+        <doc:documentation xml:lang="en">
+            This group describes the content of syntax node elements (either 'keyword', 'param[@id]', 'tag[@id]').
+        </doc:documentation>
+
+        <rng:interleave>
+            <rng:ref name="G_NativeCode">
+                <doc:documentation xml:lang="en">
+                    Native code may be inserted for each syntax node, in order to have code being executed when this syntax node is reached.
+                </doc:documentation>
+            </rng:ref>
+            <rng:zeroOrMore>
+                <rng:ref name="T_Keyword">
+                    <doc:documentation xml:lang="en">
+                        Insert keywords.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+            <rng:zeroOrMore>
+                <rng:ref name="T_Param">
+                    <doc:documentation xml:lang="en">
+                        Insert parameters.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:zeroOrMore>
+            <rng:mixed>
+                <rng:zeroOrMore>
+                    <rng:ref name="T_Tag">
+                        <doc:documentation xml:lang="en">
+                            Start new tags.
+                        </doc:documentation>
+                    </rng:ref>
+                </rng:zeroOrMore>
+                <rng:zeroOrMore>
+                    <rng:ref name="T_TagRef">
+                        <doc:documentation xml:lang="en">
+                            Make jumps within the syntax tree.
+                        </doc:documentation>
+                    </rng:ref>
+                </rng:zeroOrMore>
+            </rng:mixed>
+            <rng:optional>
+                <rng:ref name="T_Endl">
+                    <doc:documentation xml:lang="en">
+                        Terminate command lines with and 'endl' element.
+                    </doc:documentation>
+                </rng:ref>
+            </rng:optional>
+        </rng:interleave>
+    </rng:define>
+
+</rng:grammar>

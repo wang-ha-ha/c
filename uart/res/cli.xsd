@@ -1,0 +1,794 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+    Copyright (c) 2006-2018, Alexis Royer, http://alexis.royer.free.fr/CLI
+
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+        * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation
+          and/or other materials provided with the distribution.
+        * Neither the name of the CLI library project nor the names of its contributors may be used to endorse or promote products derived from this software
+          without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:cli="http://alexis.royer.free.fr/CLI" targetNamespace="http://alexis.royer.free.fr/CLI"
+            elementFormDefault="qualified" attributeFormDefault="unqualified">
+
+    <xsd:annotation>
+        <xsd:documentation xml:lang="en">
+            Avant-propos:
+
+            While writing this schema, I faced a problem with the XML Schema technology.
+            I did not manage to:
+                *   distinguish 'tag[@id]' and 'tag[@ref]' elements, which may appear at the same location in CLI ressource XML trees
+                    (the same with 'menu[@name]' and 'menu[@ref]' elements);
+                *   describe key and key reference constraints of these elements.
+            As far as I have understood, it is due to limitations of the XML Schema syntax:
+                *   no way to specify different check path of an element depending on its attributes;
+                *   XPath limitations induced by XML Schema.
+
+            I feel a little bit confused with these limitations, since it is the way XML Schema works itself.
+            It is possible indeed to use 'element' elements with either a '@type' attribute or not,
+            with different contents depending on the presence of this attribute:
+                *   when the attribute '@type' is present,
+                    it refers to a 'complexType' or 'simpleType' described somewhere else,
+                    and has no content (xmllint output: Element '{http://www.w3.org/2001/XMLSchema}element': The attribute 'type' and the &lt;complexType&gt; child are mutually exclusive.);
+                *   when the attribute '@type' is not present,
+                    the 'element' element may contain either a 'complexType' or 'simpleType' element in-place.
+            If it was actually not possible to describe such kind of constraint with XML Schema, then it would mean that XML Schema is not reflexive.
+            That is the reason why I am confused whe considering there are XML Schema limitations, and I suspect myself to be wrong.
+            If you have any explanation on that topic, I would appreciate your return.
+
+            Anyways, this XML Schema is provided as is, in order to enable first validations of CLI XML resource files.
+            For the reasons described above, it is quite permissive regarding tag and menu elements.
+        </xsd:documentation>
+    </xsd:annotation>
+
+    <!-- Main node. -->
+    <xsd:element name="cli" type="cli:T_Cli">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                A CLI XML resource file starts with a 'cli' element.
+            </xsd:documentation>
+        </xsd:annotation>
+
+        <xsd:unique name="U_Menu">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Menu names are unique.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:selector xpath="cli:cli | .//cli:menu"/>
+            <xsd:field xpath="@name"/>
+        </xsd:unique>
+        <xsd:unique name="U_Tag">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Tag identifiers are unique.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:selector xpath=".//cli:tag"/>
+            <xsd:field xpath="@id"/>
+        </xsd:unique>
+    </xsd:element>
+
+    <!-- CLI definition. The main node defines the main menu. -->
+    <xsd:complexType name="T_Cli">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                The 'cli' element basically works like a menu element:
+                it directly contains 'keyword' and 'tag' elements which start commands lines, and handler elements.
+                It may also contains 'menu' elements for each sub-menu description at the top location (and not "in-place").
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:element name="comment" type="cli:T_Comment" minOccurs="0" maxOccurs="unbounded">
+                    <xsd:annotation>
+                        <xsd:documentation xml:lang="en">
+                            Only the 'cli' element may contain 'comment' nodes.
+                        </xsd:documentation>
+                    </xsd:annotation>
+                </xsd:element>
+                <xsd:group ref="cli:G_MenuContent"/>
+                <!--<xsd:element name="menu[@name]" type="cli:T_Menu"/>-->
+                <xsd:element name="menu" type="cli:T_MenuAnyType">
+                    <xsd:annotation>
+                        <xsd:documentation xml:lang="en">
+                            Please see 'Avant-propos'.
+                            Only 'menu[@name]' elements may appear at this location of the CLI XML resource file.
+                        </xsd:documentation>
+                    </xsd:annotation>
+                </xsd:element>
+            </xsd:choice>
+        </xsd:sequence>
+        <xsd:attribute name="name" type="xsd:string" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@name' attribute describes the name of the cli, which is the also the main menu.
+                    It is both a resource name and an identifier.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="cpp" type="xsd:string" use="optional">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@cpp' attribute allows you to indicate to name of a global C++ pointer variable, which points to the CLI instance when it is statically generated.
+                    It tends to be deprecated since smarter way of integration have been designed.
+                    Please refer to the user manual for further information.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Menu and menu reference nodes. -->
+    <xsd:complexType name="T_MenuAnyType">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Please see 'Avant-propos'.
+                '@name' and '@ref' attributes are exclusive.
+
+                'menu[@name]' elements describe a menu.
+                Menus provide sets of command lines.
+                When the CLI starts, the CLI main menu is active, then the CLI enters and quits sub-menus on a LIFO principle.
+                Sub-menus can be referenced thanks to 'menu' elements placed in 'endl' elements.
+                A CLI menu automatically provides regular command lines like 'help', 'pwm', 'exit' and 'quit'.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:group ref="cli:G_MenuContent"/>
+            </xsd:choice>
+        </xsd:sequence>
+        <xsd:attribute name="name" type="xsd:string" use="optional"><!-- use="required"-->
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Please see 'Avant-propos'.
+                    Should be 'required' for 'menu[@name]' elements.
+
+                    The '@name' attribute describes the name of the menu.
+                    It is both a resource name and an identifier.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="ref" type="xsd:string" use="optional"><!-- use="required"-->
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Please see 'Avant-propos'.
+                    Should be 'required' for 'menu[@ref]' elements.
+
+                    The '@ref' attribute references the name of menu previously declared,
+                    either by a 'menu[@name]' or the main 'cli' element.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Comment node. -->
+    <xsd:complexType name="T_Comment">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                'comment' nodes declare patterns for comment lines definition.
+                They may be declared within the 'cli' element only.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:attribute name="start" type="xsd:string" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Only starter patterns are managed for the moment.
+                    They have been defined through a '@start' attribute for future evolution concerns, in case we would like to add a '@end' as well.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Keyword node. -->
+    <xsd:complexType name="T_Keyword">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Keywords are the base of command lines.
+                A sequence of keywords (and optionally parameters) terminated by a 'endl' element constitute a command line.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:group ref="cli:G_SyntaxNodeContent"/>
+            </xsd:choice>
+        </xsd:sequence>
+        <xsd:attribute name="string" type="xsd:string" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@string' attribute describe the keyword string itself.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Parameter node. -->
+    <xsd:complexType name="T_Param">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Parameters may be used within a keyword sequence, in order to let the user enter variable values.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:group ref="cli:G_SyntaxNodeContent"/>
+            </xsd:choice>
+        </xsd:sequence>
+        <xsd:attribute name="id" type="xsd:string" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@id' attribute gives a name to the parameter.
+                    This identifier may be displayed in command line helps, either at run time or in documentation generation.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="type" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@type' attribute indicates which one of the types available this parameter is a kind of:
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="string">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Basic string value. No particular constraint (eg 'hello').
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="int">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Integer value (eg '1').
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="float">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Float value (eg '1.5').
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="host">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Host name, network address (eg: '192.168.1.1').
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>
+    </xsd:complexType>
+    <!-- Parameter reference node. -->
+    <xsd:complexType name="T_ParamRef">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Parameters references may be used within native code elements.
+                Use them just as if you were using a native code value.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:attribute name="param" type="xsd:string" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@param' attribute references a parameter identifier previously declared in a '@id' attribute of a 'param' element.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Tag and tag reference nodes. -->
+    <xsd:complexType name="T_TagAnyType">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Please see 'Avant-propos'.
+                '@id' and '@ref' attributes are exclusive.
+                'tag[@ref]' may contain a '@max' attribute and shall not have any content.
+
+                'tag' elements allow you to implement jumps in the CLI syntax tree.
+                'tag[@ref]' elements reference 'tag[@id]' elements, indicating a possible jump from 'tag[@ref]' to 'tag[@id]'.
+                Basically, these jumps can be used to implement optional parts a command line.
+                These jumps may be backward jumps, in order to implement patterns like 'a[b][c][d]',
+                or forward jumps, in order to implement patterns like 'a(b|c)d'.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:group ref="cli:G_SyntaxNodeContent"/>
+            </xsd:choice>
+        </xsd:sequence>
+        <xsd:attribute name="id" type="xsd:string" use="optional"><!-- use="required"-->
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Please see 'Avant-propos'.
+                    Should be 'required' for 'tag[@id]' elements.
+
+                    The '@id' attribute describes the identifier of the tag.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="ref" type="xsd:string" use="optional"><!-- use="required"-->
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    Please see 'Avant-propos'.
+                    Should be 'required' for 'tag[@ref]' elements.
+
+                    The '@ref' attribute references the identifier of a 'tag[@id]' declared somewhere else.
+                </xsd:documentation>
+            </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="hollow" use="optional" default="no">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@hollow' attribute indicates whether the tag child elements are directly visible from its parent element or not.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="yes">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                When the tag is a hollow tag, its children elements are not visible from the parent element.
+                                The tag must be referenced so that its content can be reached.
+                                This kind of tag is usually used in order to implement forward jumps.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="no">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                By default, when the tag is not a hollow tag, its children elements are directly visible from the parent element.
+                                The tag may also be referenced so that its content can be reached from other locations of the CLI syntax tree.
+                                This kind of tag is usually used in order to implement backward jumps.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>
+        <xsd:attribute name="max" use="optional" default="unbounded">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@max' attribute indicates the maximum number of times this jump in the CLI syntax tree can be used for one command line.
+                    It is useful when implementing a backward tag.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="1">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                When the '@max' attribute is '1', it basically implements a non repeatable optional part of a command line.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="unbounded">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                When the '@max' attribute is 'unbounded', it indicates that the optional part of the command line may be repeated.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- End of line node. -->
+    <xsd:complexType name="T_Endl">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                'endl' (end of line) elements terminate a command line.
+                They basically contain native code in order to execute the action described by the command line,
+                implemented in the rest of the native application.
+                They may also lead to sub-menus.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:group ref="cli:G_Help"/>
+                <xsd:group ref="cli:G_NativeCode"/>
+                <!--<xsd:element name="menu[@name]" type="cli:T_Menu"/>-->
+                <!--<xsd:element name="menu[@ref]" type="cli:T_MenuRef"/>-->
+                <xsd:element name="menu" type="cli:T_MenuAnyType">
+                    <xsd:annotation>
+                        <xsd:documentation xml:lang="en">
+                            Please see 'Avant-propos'.
+                            Use either 'menu[@ref]' elements in order reference a sub-menu defined somewhere else in the document,
+                            or a 'menu[@name]' element in order to define the menu in-place.
+                        </xsd:documentation>
+                    </xsd:annotation>
+                </xsd:element>
+            </xsd:choice>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- Native code nodes. -->
+    <xsd:complexType name="T_Handler">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                Handler sections allow you to trigger native on certain events.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:choice minOccurs="0" maxOccurs="unbounded">
+            <xsd:group ref="cli:G_NativeCode"/>
+        </xsd:choice>
+        <xsd:attribute name="name" use="required">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@name' attribute specifies which kind of handler is triggered.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="error">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                The 'error' value allows to trigger native code when an error occurs.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="exit">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                The 'exit' value allows to trigger native code when the menu exits.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="prompt">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                The 'prompt' value allows to modify the prompt displayed for the menu, depending on the context.
+                                The code attached must return a string.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>
+    </xsd:complexType>
+    <xsd:complexType name="T_NativeCode" mixed="true">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                A native code element has a mixed content.
+                It contains text which directly correspond to native code,
+                and special elements that make the link between the CLI elements and the native code.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:choice minOccurs="0" maxOccurs="unbounded">
+            <xsd:element name="out">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        The 'out' element represents the regular output stream.
+
+                        Use it instead of printf() or std::cout in C++, or System.out in Java, in order to benefit from the generic input / output device principle.
+                        This way, you can control where all outputs should be directed, depending on the output device you make the shell running with:
+                            - either a regular console device,
+                            - a telnet device for remote access,
+                            - a file device for logging,
+                            - even a null device to turn the outputs off
+                            - ...
+
+                        Use it as would use std::cout in c++, with the &lt;&lt; operator.
+                            eg: &lt;out/&gt; &lt;&lt; "hello" &lt;&lt; cli::endl;
+                        Use it as an object with put() and endl() methods in Java.
+                            eg: &lt;out/&gt;.put("hello").endl();
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="err">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Same as 'out' element, but for the error output stream.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="value-of" type="cli:T_ParamRef">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        The 'value-of' element allows you to use the values given by the user for each 'param' element within a command line.
+                        Use it as you would use a variable in the native code.
+                            eg: int a = &lt;value-of param="my-param"/&gt;;
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:choice>
+        <xsd:attribute name="option" use="optional">
+            <xsd:annotation>
+                <xsd:documentation xml:lang="en">
+                    The '@option' attribute may be used in order to place native code in extra sections.
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="head">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Both C++ and Java.
+
+                                Extra section which can be used in order to place code at the top of the native code file generated.
+                                Before includes for C++ and before imports for java.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="include">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                C++ only.
+
+                                A C++ extra section called 'include' allows the insertion of native code right after the CLI library includes.
+                                Basically '#include "..."' pieces of code.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="import">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Java only.
+
+                                A Java extra section called 'import' allows the insertion of native code right after the CLI library imports.
+                                Basically 'import "..."' pieces of code.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="types">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                C++ only.
+
+                                The 'types' section is deprecated.
+                                It is placed right after the 'include' section.
+                                Prefer either types definition throughout a specific include file,
+                                or inner type declarations directly within the context of a menu with the 'members' section.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="vars">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                C++ only.
+
+                                The 'vars' section is deprecated.
+                                It is placed right after the 'types' section.
+                                Prefer 'members' and 'constructor' sections for persistent variable declarations and initializations.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="members">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Both C++ and Java.
+
+                                Within the context of a menu, the 'members' section alloww you declare variables in the context of this menu.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="constructor">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Both C++ and Java.
+
+                                Within the context of a menu, the 'constructor' section allows you to execute native code at the initialization of that menu.
+                                It basically permits the initialization of member variables declared with in the 'members' section.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="body">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                C++ only.
+
+                                The 'body' section is deprecated.
+                                It is placed right before the 'tail' section.
+                                Prefer 'tail' section.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                    <xsd:enumeration value="tail">
+                        <xsd:annotation>
+                            <xsd:documentation xml:lang="en">
+                                Both C++ and Java.
+
+                                Add native code after any CLI code generated, at the very end of the file.
+                            </xsd:documentation>
+                        </xsd:annotation>
+                    </xsd:enumeration>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>
+    </xsd:complexType>
+
+    <!-- Help node. -->
+    <xsd:complexType name="T_Help">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                'help' elements allow you to attach help for every significant CLI element: 'menu', 'keyword', 'param', 'endl'.
+                You may attach as many 'help' elements to a node for each language you want to manage.
+                This help is automatically displayed by the shell at run time, and is also used by the documentation generation stylesheet.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:simpleContent>
+            <xsd:extension base="xsd:string">
+                <xsd:attribute name="lang" use="required">
+                    <xsd:annotation>
+                        <xsd:documentation xml:lang="en">
+                            The '@lang' attribute describes the language of the help resource.
+                        </xsd:documentation>
+                    </xsd:annotation>
+                    <xsd:simpleType>
+                        <xsd:restriction base="xsd:language">
+                            <xsd:enumeration value="en">
+                                <xsd:annotation>
+                                    <xsd:documentation xml:lang="en">
+                                        English language.
+                                    </xsd:documentation>
+                                </xsd:annotation>
+                            </xsd:enumeration>
+                            <xsd:enumeration value="fr">
+                                <xsd:annotation>
+                                    <xsd:documentation xml:lang="en">
+                                        French language.
+                                    </xsd:documentation>
+                                </xsd:annotation>
+                            </xsd:enumeration>
+                        </xsd:restriction>
+                    </xsd:simpleType>
+                </xsd:attribute>
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <!-- Groups. -->
+    <xsd:group name="G_Help">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                This group describes the sequence of 'help' elements you may attach to a CLI element.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:sequence>
+            <xsd:element name="help" type="cli:T_Help" minOccurs="0" maxOccurs="unbounded">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Provide as much help as you can, for every language you manage.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+    <xsd:group name="G_NativeCode">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                This group describes the way you may attach native code to a CLI element.
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:choice>
+            <xsd:element name="cpp" type="cli:T_NativeCode">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Attach C++ native code.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="java" type="cli:T_NativeCode">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Attach Java native code.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:choice>
+    </xsd:group>
+    <xsd:group name="G_MenuContent">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                This group describes the content of menu elements (either 'cli' or 'menu[@name]').
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:choice>
+            <xsd:group ref="cli:G_NativeCode">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Native code may be inserted at the top location of a menu, in order to have code being executed before any command analysis.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:group>
+            <xsd:element name="keyword" type="cli:T_Keyword">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Start command lines with keywords.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <!--<xsd:element name="tag[@id]" type="cli:T_Tag"/>-->
+            <!--<xsd:element name="tag[@ref]" type="cli:TagRef"/>-->
+            <xsd:element name="tag" type="cli:T_TagAnyType">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Please see 'Avant-propos'.
+                        'tag[@id]' or 'tag[@ref]' at this location of the CLI XML resource file.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="handler" type="cli:T_Handler">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Trigger native code to handlers.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:choice>
+    </xsd:group>
+    <xsd:group name="G_SyntaxNodeContent">
+        <xsd:annotation>
+            <xsd:documentation xml:lang="en">
+                This group describes the content of syntax node elements (either 'keyword', 'param[@id]', 'tag[@id]').
+            </xsd:documentation>
+        </xsd:annotation>
+        <xsd:choice>
+            <xsd:group ref="cli:G_NativeCode">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Native code may be inserted for each syntax node, in order to have code being executed when this syntax node is reached.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:group>
+            <xsd:element name="keyword" type="cli:T_Keyword">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Insert keywords.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="param" type="cli:T_Param">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Insert parameters.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <xsd:element name="endl" type="cli:T_Endl">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Terminate command lines with and 'endl' element.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+            <!--<xsd:element name="tag[@id]" type="cli:T_Tag"/>-->
+            <!--<xsd:element name="tag[@ref]" type="cli:TagRef"/>-->
+            <xsd:element name="tag" type="cli:T_TagAnyType">
+                <xsd:annotation>
+                    <xsd:documentation xml:lang="en">
+                        Please see 'Avant-propos'.
+                        'tag[@id]' or 'tag[@ref]' at this location of the CLI XML resource file.
+                    </xsd:documentation>
+                </xsd:annotation>
+            </xsd:element>
+        </xsd:choice>
+    </xsd:group>
+
+</xsd:schema>
