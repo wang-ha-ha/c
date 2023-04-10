@@ -10,10 +10,10 @@ PROGS = fw_genenv fw_setenv
 
 all: $(PROGS)
 
-fw_genenv: fw_genenv.host.o crc16.host.o
+fw_genenv: fw_genenv.host.o crc32.host.o
 	$(HOST_CC) $(HOST_LDFLAG) -o $@ $^
 
-fw_setenv: fw_setenv.cross.o crc16.cross.o fw_env.cross.o
+fw_setenv: fw_setenv.cross.o crc32.cross.o fw_env.cross.o
 	$(CROSS_CC) $(CROSS_LDFLAG) -o $@ $^
 	$(CROSS_STRIP) $@
 
@@ -23,8 +23,13 @@ fw_setenv: fw_setenv.cross.o crc16.cross.o fw_env.cross.o
 %.cross.o:%.c
 	$(CROSS_CC) -c $(CROSS_CFLAGS) $< -o $@
 
+install:
+	cp fw_genenv ../../../env_config
+	#ln -s  fw_setenv fw_printenv
+	cp fw_setenv ../../../../os/rootfs/7.2.0/camera/system/bin
+
 clean:
-	rm -f *.o *~
+	-rm -f *.o *~ 
 
 distclean: clean
-	rm -f $(PROGS)
+	-rm -f $(PROGS) fw_printenv

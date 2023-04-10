@@ -2,9 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define ENV_MAXLEN 0x1000
+#include "layout.h"
 
-extern unsigned short crc16_ccitt(const void *buf, int len);
+#define ENV_MAXLEN 0x2000
+
+extern unsigned int crc32(unsigned int crc, const unsigned char *buf, unsigned int len);
 
 static int save_file(const char *fileName, const char *buf,int len)
 {
@@ -108,16 +110,30 @@ static int parse_env_line(char *line, char **name, char **value)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 3) 
+    if (argc != 4) 
     {
-        printf("Usage: fw_genenv para.txt env.bin\n\n");
+        printf("Usage: fw_genenv section para.txt env.bin\n\n");
+        return -1;
+    }
+
+    int section_size = 0;
+
+    for(int i = 0; i < g_env_layout_num; i++) {
+        if(strcmp(argv[1],g_env_layout[i].name) == 0) {
+            section_size = g_env_layout[i].size;
+        }
+    }
+
+    if(section_size == 0)
+    {
+        printf("Please enter a valid section name\n\n");
         return -1;
     }
 
     char *para_file_buf;
     char *env_buf;
     
-    int para_len = get_file_buf(argv[1],&para_file_buf);
+    int para_len = get_file_buf(argv[2],&para_file_buf);
     
     if(para_len <= 0 || para_file_buf == NULL)
     {
@@ -126,14 +142,13 @@ int main(int argc, char *argv[])
 
     para_file_buf[para_len - 1] = '\0';
 
-    env_buf = (char *)malloc(para_len + 6);
+    env_buf = (char *)malloc(section_size);
     if(env_buf == NULL) {
         printf("%s, %d:buf is NULL\n", __func__, __LINE__);
         return -1;
     }
 
-    env_buf[0] = 0xA5;
-    env_buf[1] = 0x5A;
+    memset(env_buf, 0, section_size);
 
     char *tmp = para_file_buf;
     char *tmp1 = env_buf + 4;
@@ -167,15 +182,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    env_buf[2] = env_len >> 8;
-    env_buf[3] = env_len & 0xff;
+    int crc = crc32(0, (unsigned char *)env_buf + 4, section_size - 4);
 
-    int crc16 = crc16_ccitt(env_buf,env_len + 4);
+    memcpy(env_buf,(unsigned *)&crc,4);
 
-    env_buf[env_len + 4] = crc16 >> 8;
-    env_buf[env_len + 4 + 1] = crc16 & 0xff;
-
-    save_file(argv[2],env_buf,env_len + 6);
+    save_file(argv[3],env_buf,env_len + 4);
 
     free(env_buf);
     free(para_file_buf);

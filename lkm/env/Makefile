@@ -8,7 +8,7 @@ all: modules
 
 .PHONY: modules clean
 
-$(MODULE_NAME)-objs := env.o
+$(MODULE_NAME)-objs := env.o crc32.o
 obj-m := $(MODULE_NAME).o
 
 modules:

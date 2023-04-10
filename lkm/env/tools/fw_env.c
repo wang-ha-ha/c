@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "layout.h"
+
 #define ENV_IOC_MAGIC    'e'
 #define ENV_IOC_MAXNR    5
 #define ENV_IOCGET        _IOR(ENV_IOC_MAGIC, 0, unsigned long)
@@ -20,20 +22,19 @@
 #define ENV_IOCPRT        _IOR(ENV_IOC_MAGIC, 4, unsigned long)
 #define ENV_IOCSAVE        _IOR(ENV_IOC_MAGIC, 5, unsigned long)
 
-#define ENV_NAME_MAXLEN    64
-
-typedef struct env_ioctl_args
-{
-    char name[ENV_NAME_MAXLEN];
-    char * buf;
+#define ENV_NAME_MAXLEN 64
+typedef struct env_ioctl_args {
+    char section_name[ENV_NAME_MAXLEN];
+    char key[ENV_NAME_MAXLEN];
+    char *buf;
     int maxlen;
-    int  overwrite;
-}env_ioctl_args_t;
+    int overwrite;
+} env_ioctl_args_t;
 
 #ifdef CONFIG_ENV_MAXLEN
 #define ENV_VALUE_MAXLEN    CONFIG_ENV_MAXLEN
 #else
-#define ENV_VALUE_MAXLEN    0x1000
+#define ENV_VALUE_MAXLEN    0x2000
 #endif
 
 static char env_value_buf[ENV_VALUE_MAXLEN];
@@ -43,6 +44,7 @@ static pthread_mutex_t env_value_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int dev_fd = -1;
 
 static int env_open(void);
+extern void usage(void);
 
 #define CHECK_ENV_OPEN()    \
     do{ \
@@ -52,7 +54,7 @@ static int env_open(void);
     }while(0);
 
 //FIXME:  The string pointed to by the return value of fw_env_get() is statically allocated, and can  be modified  by  a  subsequent  call.
-char * fw_env_get(const char * key)
+char * fw_env_get(const char * section_name,const char * key)
 {
     if (key == NULL) {
         return NULL;
@@ -68,8 +70,8 @@ char * fw_env_get(const char * key)
 
     env_ioctl_args_t arg;
     memset(&arg, 0, sizeof(arg)); 
-
-    strncpy(arg.name, key, sizeof(arg.name));
+    strncpy(arg.section_name, section_name, sizeof(arg.section_name));
+    strncpy(arg.key, key, sizeof(arg.key));
     arg.buf = env_value_buf + env_value_off;
     arg.maxlen = sizeof(env_value_buf) - env_value_off;
 
@@ -97,14 +99,13 @@ char * fw_env_get(const char * key)
     }
 
     env_value_off += strlen(arg.buf) + 1;
-
     pthread_mutex_unlock(&env_value_mutex);
     return arg.buf;
 }
 
-int fw_env_set(const char *name, const char *value, int overwrite)
+int fw_env_set(const char * section_name,const char *key, const char *value, int overwrite)
 {
-    if (name == NULL || value == NULL) {
+    if (key == NULL || value == NULL) {
         return -1;
     }
 
@@ -112,7 +113,8 @@ int fw_env_set(const char *name, const char *value, int overwrite)
 
     env_ioctl_args_t arg;
     memset(&arg, 0, sizeof(arg)); 
-    strncpy(arg.name, name, sizeof(arg.name));
+    strncpy(arg.section_name, section_name, sizeof(arg.section_name));
+    strncpy(arg.key, key, sizeof(arg.key));
     arg.buf = (char *)value;
     arg.maxlen = strlen(value)+1;
     arg.overwrite = overwrite;
@@ -120,9 +122,9 @@ int fw_env_set(const char *name, const char *value, int overwrite)
     return ioctl(dev_fd, ENV_IOCSET, &arg);
 }
 
-int fw_env_unset(const char *name)
+int fw_env_unset(const char * section_name,const char *key)
 {
-    if (name == NULL) {
+    if (key == NULL) {
         return -1;
     }
 
@@ -130,19 +132,24 @@ int fw_env_unset(const char *name)
 
     env_ioctl_args_t arg;
     memset(&arg, 0, sizeof(arg)); 
-    strncpy(arg.name, name, sizeof(arg.name));
+    strncpy(arg.section_name, section_name, sizeof(arg.section_name));
+    strncpy(arg.key, key, sizeof(arg.key));
 
     return ioctl(dev_fd, ENV_IOCUNSET, &arg);
 }
 
-int fw_env_clear(void)
+int fw_env_clear(const char * section_name)
 {
     CHECK_ENV_OPEN();
+    
+    env_ioctl_args_t arg;
+    memset(&arg, 0, sizeof(arg)); 
+    strncpy(arg.section_name, section_name, sizeof(arg.section_name));
 
-    return ioctl(dev_fd, ENV_IOCCLR, NULL);
+    return ioctl(dev_fd, ENV_IOCCLR, &arg);
 }
 
-void fw_env_print(void)
+void fw_env_print(const char * section_name)
 {
     CHECK_ENV_OPEN();
 
@@ -154,12 +161,28 @@ void fw_env_print(void)
 
     env_ioctl_args_t arg;
     memset(&arg, 0, sizeof(arg)); 
-    arg.buf = buf;
-    arg.maxlen = ENV_VALUE_MAXLEN;
+    if(section_name == NULL) {
+        for(int i = 0; i < g_env_layout_num; i++) {
+            strncpy(arg.section_name, g_env_layout[i].name, sizeof(arg.section_name));
+            arg.buf = buf;
+            arg.maxlen = ENV_VALUE_MAXLEN;
 
-    int ret = ioctl(dev_fd, ENV_IOCPRT, &arg);
-    if (ret == 0) {
-        printf("%s\n", arg.buf);
+            int ret = ioctl(dev_fd, ENV_IOCPRT, &arg);
+            if (ret == 0) {
+                printf("-------%s-------\n",g_env_layout[i].name);
+                printf("%s\n", arg.buf);
+            }
+        }
+    }
+    else {
+        strncpy(arg.section_name, section_name, sizeof(arg.section_name));
+        arg.buf = buf;
+        arg.maxlen = ENV_VALUE_MAXLEN;
+
+        int ret = ioctl(dev_fd, ENV_IOCPRT, &arg);
+        if (ret == 0) {
+            printf("%s\n", arg.buf);
+        }
     }
 
     free(buf);
@@ -226,21 +249,21 @@ int parse_env_line(char *line, char **name, char **value)
 }
 
 /* Read each line from FILENAME, and do fw_env_set() for each. */
-static void setenv_from_file(char *filename)
+static void setenv_from_file(char *filename,const char * section_name)
 {
-    char line[200];
+    char line[512];
     FILE *fp_txt = fopen(filename, "r");
     if (fp_txt == NULL) {
         fprintf(stderr, "Cannot open %s\n", filename);
         return;
     }
-    while (fgets(line, 200, fp_txt)) {
-        char *name, *value;
-        if (parse_env_line(line, &name, &value) == 0) {
+    while (fgets(line, sizeof(line), fp_txt)) {
+        char *key, *value;
+        if (parse_env_line(line, &key, &value) == 0) {
             if (strlen(value)) {
-                fw_env_set(name, value, 1);
+                fw_env_set(section_name,key, value, 1);
             } else {
-                fw_env_unset(name);
+                fw_env_unset(section_name,key);
             }
         }
     }
@@ -278,52 +301,59 @@ int fw_env_close(void)
 void fw_printenv(int argc, char *argv[])
 {
     if (argc == 1) {
-        fw_env_print();
-    } else {
-        const char *value = fw_env_get(argv[1]);
+        fw_env_print(NULL);
+    }
+    else if (argc == 2) {
+        fw_env_print(argv[1]);
+    }
+    else if(argc == 3){
+        const char *value = fw_env_get(argv[1],argv[2]);
         if (value) {
             puts(value);
         }
+    } 
+    else {
+        usage();
     }
 }
 
 void fw_setenv(int argc, char *argv[])
 {
     if (argc == 1) {
-        fw_env_print();
-    } else if (argc == 3) {
+        fw_env_print(NULL);
+    } else if (argc == 4) {
         if (strcmp(argv[1], "-s") == 0) {
-            setenv_from_file(argv[2]);
+            setenv_from_file(argv[2],argv[3]);
         } else {
-            fw_env_set(argv[1], argv[2], 1);
+            fw_env_set(argv[1], argv[2], argv[3], 1);
         }
     }
-    else if(argc == 2) {
+    else if(argc == 3) {
         if (strcmp(argv[1], "-c") == 0){
-            fw_env_clear();
+            fw_env_clear(argv[2]);
         }else{
-            fw_env_unset(argv[1]);
+            fw_env_unset(argv[1], argv[2]);
         }
     } else {
-        printf("ERROR: Invalid arguments\n");
+        usage();
         return;
     }
 }
 
-int fw_env_getint(const char *name, int default_value)
+int fw_env_getint(const char * section_name,const char *key, int default_value)
 {
     int value = default_value;
-    const char *env = fw_env_get(name);
+    const char *env = fw_env_get(section_name,key);
     if (env) {
         value = atoi(env);
     }
     return value;
 }
 
-char *fw_env_getstr(const char *name, char *default_value)
+char *fw_env_getstr(const char * section_name,const char *key, char *default_value)
 {
     char *value = default_value;
-    char *env = fw_env_get(name);
+    char *env = fw_env_get(section_name,key);
     if (env) {
         value = env;
     }
