@@ -1,3 +1,5 @@
 *.o
 sm_read
 sm_write
+share_push_stream/test_read
+share_push_stream/test_write
