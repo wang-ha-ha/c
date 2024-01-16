@@ -11,13 +11,14 @@
 
 #include "ringbuf.h"
 
-int ringbuf_init(ringbuf *ringbuf,int len,int block_size)
+int ringbuf_init(ringbuf *ringbuf,int len,int block_size,int flag)
 {
     ringbuf->block_size = block_size;
     ringbuf->len = len;
-    ringbuf->tail = 0;
-	ringbuf->head = 0;
-
+    if(flag == 0) {
+        ringbuf->tail = 0;
+        ringbuf->head = 0;
+    }
     return 0;
 }
 
@@ -55,4 +56,12 @@ int ringbuf_read_block(ringbuf *ringbuf,char *buf,int len)
     ringbuf->head = (ringbuf->head + 1) % ringbuf->len;
     
     return len;
+}
+
+int ringbuf_get_free_num(ringbuf *ringbuf)
+{
+    printf("%d=%d\n", ringbuf->head, ringbuf->tail);
+    if(ringbuf->head <= ringbuf->tail)
+        return ringbuf->head - ringbuf->tail - 1 + ringbuf->len;
+    return ringbuf->len - ringbuf->head - ringbuf->tail - 1;
 }

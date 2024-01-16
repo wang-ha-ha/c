@@ -55,8 +55,8 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    ringbuf_init(rb,512,4096);
-
+    // ringbuf_init(rb,512,4096,1);
+#ifndef STREAM
     while (1) {
         if(ringbuf_read_block(rb,g_msg_buf,sizeof(g_msg_buf)) < 0) {
             usleep(1);
@@ -67,6 +67,48 @@ int main(int argc, char **argv)
         if(crc != msg->crc)
             printf("error:crc:%d,type:%d\n",msg->crc,msg->type);
     }
-
+#else
+    while(1) {
+        if(ringbuf_read_block(rb,g_msg_buf,sizeof(g_msg_buf)) < 0) {
+            usleep(1);
+            continue;
+        }
+        ringbuf_stream *msg;
+    restart:
+        msg = (ringbuf_stream *)g_msg_buf;
+        printf("frame_len:%d,type:%d,seq:%d,len:%d\n",msg->frame_len,msg->type,msg->seq,msg->len);
+        if(msg->type != 0){
+            char *stream_buf = (char *) malloc(msg->frame_len);
+            if(stream_buf == NULL) {
+                printf("Error malloc !\n");
+                exit(1);
+            }
+            int real_read = 0;
+            int frame_len = msg->frame_len;
+            memcpy(stream_buf + real_read,msg->p_buf,msg->len);
+            real_read += msg->len;
+            while(real_read < frame_len) {
+                if(ringbuf_read_block(rb,g_msg_buf,sizeof(g_msg_buf)) < 0) {
+                    usleep(1);
+                    continue;
+                }
+                if(msg->type == 0){
+                    memcpy(stream_buf + real_read,msg->p_buf,msg->len);
+                    real_read += msg->len;
+                } else {
+                    printf("error: frame read,Dropped frame\n");
+                    free(stream_buf);
+                    goto restart;
+                }
+            }
+            if(real_read != frame_len) {
+                printf("error: read len\n");
+            }
+            free(stream_buf);
+        } else {
+            printf("error: first type is zero,Dropped frame\n");
+        }
+    }
+#endif
     return 0;
 }
