@@ -8,11 +8,12 @@
 #include <linux/uaccess.h>
 #include <linux/mtd/mtd.h>
 #include <linux/slab.h>
-
+#include <linux/delay.h>
 #include "layout.h"
 #include "crc32.h"
 
 // #define DEBUG
+#define MTD_NAME "Env"
 
 typedef struct
 {
@@ -32,6 +33,7 @@ typedef struct env_dev_s{
     int section_num;
     struct semaphore sem;
     uint32_t refcnt;
+    int locked;
 } env_dev_t;
 
 static env_dev_t *g_env_dev;
@@ -100,7 +102,7 @@ done:
 static int setenv(env_dev_t *dev, const char *section_name, const char *key, const char *value,
           int overwrite)
 {
-    int ret = 0;
+    int ret = 0,i;
     char *tmp,*env_buf;
     int envlen = 0;
     int old_l, new_l, tmpl;
@@ -130,8 +132,6 @@ static int setenv(env_dev_t *dev, const char *section_name, const char *key, con
         goto done;
     }
 
-    section->dirty_flag = 1;
-
     if (overwrite == 1) {
         tmp = getenv(dev, section_name, key, 1);
         if ((tmp != NULL) && (*(tmp - 1) == '=')) {
@@ -145,6 +145,12 @@ static int setenv(env_dev_t *dev, const char *section_name, const char *key, con
                 *(tmp + new_l) = '\0';
                 envlen = envlen - old_l + new_l;
                 env_buf[envlen] = '\0';
+                if(old_l > new_l) {
+                    for(i = envlen;(i < envlen + old_l)&&(i < section->size);i++) {
+                        env_buf[i] = '\0';
+                    }
+                }
+                section->dirty_flag = 1;
             }
         } else {
             goto setenv_add; // if cann't find key should set as a new env.
@@ -163,6 +169,7 @@ static int setenv(env_dev_t *dev, const char *section_name, const char *key, con
             *tmp = '\0';
             envlen += tmpl;
             section->env_count++;
+            section->dirty_flag = 1;
         }
     }
 
@@ -175,7 +182,7 @@ done:
 
 static int unsetenv(env_dev_t *dev, const char *section_name, const char *key)
 {
-    int ret = 0;
+    int ret = 0,i,size = 0;
     char *tmp,*env_buf;
     section_t * section;
 
@@ -207,13 +214,20 @@ static int unsetenv(env_dev_t *dev, const char *section_name, const char *key)
     if (tmp != NULL) {
         if (*(tmp - 1) == '=') {
             tmp -= (strlen(key) + 1); // point to header
-            section->env_len -= (strlen(tmp) + 1);
-            memmove(tmp, tmp + strlen(tmp) + 1,
+            size = (strlen(tmp) + 1);
+            section->env_len -= size;
+            memmove(tmp, tmp + size,
                 section->env_len - (tmp - env_buf));
             env_buf[section->env_len] = '\0';
+            #ifdef DEBUG
+            printk("env:%d,%d\n", section->env_len,size);
+            #endif
+            for(i = section->env_len;(i < section->env_len + size)&&(i < section->size);i++) {
+                env_buf[i] = '\0';
+            }
             section->env_count--;
+            section->dirty_flag = 1;
         }
-        section->dirty_flag = 1;
     }
 
 done:
@@ -310,9 +324,9 @@ static int write_to_flash(int to, char *buf, int len)
     int mtd_offset;
     struct erase_info ei;
 
-    struct mtd_info *mtd = get_mtd_device_nm("Env");
+    struct mtd_info *mtd = get_mtd_device_nm(MTD_NAME);
     if (IS_ERR(mtd)) {
-        printk(KERN_ERR "[env]ERROR %ld: No Env partition!\n", PTR_ERR(mtd));
+        printk(KERN_ERR "[env]ERROR %ld: No %s partition!\n", PTR_ERR(mtd),MTD_NAME);
         return -ENODEV;
     }
 
@@ -320,11 +334,13 @@ static int write_to_flash(int to, char *buf, int len)
         return -ENOMEM;
     }
 
+    mtd->flags |= MTD_WRITEABLE;
+
     mtd_offset = to;
     total_len = 0;
 
     while( len > 0) {
-        if ((len & (mtd->erasesize-1)) || (len < mtd->erasesize)) {            
+        if ((len & (mtd->erasesize-1)) || (len < mtd->erasesize)) {
             char *bak;
             int write_len;
             int piece_size;
@@ -332,7 +348,8 @@ static int write_to_flash(int to, char *buf, int len)
             bak = kzalloc(mtd->erasesize, GFP_KERNEL);
             
             if(bak == NULL) {
-                return -ENOMEM;
+                ret = -ENOMEM;
+                goto error;
             }
             
             bakaddr = mtd_offset & ~(mtd->erasesize - 1);
@@ -345,9 +362,10 @@ static int write_to_flash(int to, char *buf, int len)
             ei.len = mtd->erasesize;
             ret = mtd_erase(mtd, &ei);
             if (ret) {
-                printk(KERN_ERR "[env]ERROR:erase error at 0x%llx\n", ei.addr);
+                printk(KERN_ERR "[env]ERROR:erase error at 0x%llx.ret:%d\n", ei.addr,ret);
                 kfree(bak);
-                return -EIO;
+                ret = -EIO;
+                goto error;
             }
 
             piece = mtd_offset & (mtd->erasesize - 1);
@@ -367,8 +385,9 @@ static int write_to_flash(int to, char *buf, int len)
                 ret = mtd_write(mtd, bakaddr + write_len, mtd->erasesize - write_len, &_len,
                         bak + write_len);
                 if (ret) {
-                     kfree(bak);
-                    return -EIO;
+                    kfree(bak);
+                    ret = -EIO;
+                    goto error;
                 }
 
                 if (_len == 0)
@@ -376,7 +395,8 @@ static int write_to_flash(int to, char *buf, int len)
                 else if (_len < 0) {
                     printk(KERN_ERR"[env]ERROR: write failure\n");
                     kfree(bak);
-                    return -EIO;
+                    ret = -EIO;
+                    goto error;
                 }
 
                 total_len += _len;
@@ -394,10 +414,14 @@ static int write_to_flash(int to, char *buf, int len)
             ei.mtd = mtd;
             ei.len = mtd->erasesize;
             ret = mtd_erase(mtd, &ei);
+            #ifdef DEBUG
+            printk(KERN_ERR "[env]mtd_offset:0x%llx\n", ei.addr);
+            #endif
             //    if (ret || ei.state == MTD_ERASE_FAILED) {
             if (ret) {
                 printk(KERN_ERR "[env]ERROR:erase error at 0x%llx\n", ei.addr);
-                return -EIO;
+                ret = -EIO;
+                goto error;
             }
 
             write_len = 0;
@@ -405,16 +429,20 @@ static int write_to_flash(int to, char *buf, int len)
             while (write_len < mtd->erasesize) {
                 int _len;
                 ret = mtd_write(mtd, mtd_offset, mtd->erasesize - write_len, &_len,
-                        buf + write_len);
+                        buf + mtd_offset - to);
                 if (ret) {
-                    return -EIO;
+                    ret = -EIO;
+                    goto error;
                 }
-
+                #ifdef DEBUG
+                printk(KERN_ERR "[env]write_len:%d,_len:%d\n",write_len, _len);
+                #endif
                 if (_len == 0)
                     break;
                 else if (_len < 0) {
                     printk(KERN_ERR"[env]ERROR: write failure\n");
-                    return -EIO;
+                    ret = -EIO;
+                    goto error;
                 }
 
                 total_len += _len;
@@ -425,7 +453,12 @@ static int write_to_flash(int to, char *buf, int len)
         }
     }
 
+    mtd->flags &= ~MTD_WRITEABLE;
     return total_len;
+
+error:
+    mtd->flags &= ~MTD_WRITEABLE;
+    return ret;
 }
 
 static int read_from_flash(int from,unsigned char *buf, int len)
@@ -435,9 +468,9 @@ static int read_from_flash(int from,unsigned char *buf, int len)
     int mtd_offset;
     unsigned char * tmp;
 
-    struct mtd_info *mtd = get_mtd_device_nm("Env");
+    struct mtd_info *mtd = get_mtd_device_nm(MTD_NAME);
     if (IS_ERR(mtd)) {
-        printk(KERN_ERR "[env]ERROR %ld: No Env partition!\n", PTR_ERR(mtd));
+        printk(KERN_ERR "[env]ERROR %ld: No %s partition!\n", PTR_ERR(mtd),MTD_NAME);
         return -ENODEV;
     }
 
@@ -474,7 +507,9 @@ static int loadenv(env_dev_t *dev)
 
     dev->section_num = sizeof(g_env_layout)/sizeof(env_layout_t);
     dev->sections = kzalloc(sizeof(section_t) * dev->section_num, GFP_KERNEL);
-    
+    #ifdef DEBUG
+    printk(KERN_ERR"[env] section_num:%d\n",dev->section_num);
+    #endif
     if (dev->sections == NULL) {
         return -ENOMEM;
     }
@@ -551,6 +586,13 @@ static int saveenv(env_dev_t *dev, int no_sema)
         return -ERESTARTSYS;
     }
 
+    if(g_env_dev->locked == 1) {
+        if (!no_sema) {
+            up(&dev->sem);
+        }
+        return -EPERM;
+    }
+
     for(i = 0; i < dev->section_num; i++) {
         if ( dev->sections[i].flag == ENV_RO ||
             dev->sections[i].dirty_flag == 0 ) {
@@ -558,7 +600,7 @@ static int saveenv(env_dev_t *dev, int no_sema)
         }
 
         #ifdef DEBUG
-        printk(KERN_ERR"[env]: saveenv section %s!\n", dev->sections[i].name);
+        printk(KERN_ERR"[env]: saveenv section %s,flag:%d,dirty:%d!\n", dev->sections[i].name,dev->sections[i].flag,dev->sections[i].dirty_flag);
         #endif
 
         env_crc32 = crc32(0, dev->sections[i].data + 4, dev->sections[i].size - 4);
@@ -633,13 +675,15 @@ static int env_release(struct inode *inode, struct file *filp)
 }
 
 #define ENV_IOC_MAGIC 'e'
-#define ENV_IOC_MAXNR 5
+#define ENV_IOC_MAXNR 7
 #define ENV_IOCGET _IOR(ENV_IOC_MAGIC, 0, unsigned long)
 #define ENV_IOCSET _IOW(ENV_IOC_MAGIC, 1, unsigned long)
 #define ENV_IOCUNSET _IOW(ENV_IOC_MAGIC, 2, unsigned long)
 #define ENV_IOCCLR _IOW(ENV_IOC_MAGIC, 3, unsigned long)
 #define ENV_IOCPRT _IOR(ENV_IOC_MAGIC, 4, unsigned long)
 #define ENV_IOCSAVE _IOR(ENV_IOC_MAGIC, 5, unsigned long)
+#define ENV_IOCLOCK _IOR(ENV_IOC_MAGIC, 6, unsigned long)
+#define ENV_IOCUNLOCK _IOR(ENV_IOC_MAGIC, 7, unsigned long)
 
 #define ENV_NAME_MAXLEN 64
 typedef struct env_ioctl_args {
@@ -687,7 +731,11 @@ static long env_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             return -ENOBUFS;
         }
 
-        if (copy_to_user(karg.buf, env_str, karg.maxlen)) {
+        #ifdef DEBUG
+        printk(KERN_ERR"[env]: ENV_IOCGET section %s.karg.key:%s,env_str:%s,karg.maxlen:%d!\n", karg.section_name,karg.key,env_str,karg.maxlen);
+        #endif
+
+        if (copy_to_user(karg.buf, env_str, strlen(env_str) + 1)) {
             return -EFAULT;
         }
 
@@ -707,6 +755,9 @@ static long env_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             return -EFAULT;
         }
         retval = setenv(dev, karg.section_name, karg.key, value, karg.overwrite);
+        #ifdef DEBUG
+        printk(KERN_ERR"[env]: ENV_IOCSET section %s.karg.key:%s,env_str:%s!\n", karg.section_name,karg.key,value);
+        #endif
         kfree(value);
         break;
     }
@@ -739,6 +790,23 @@ static long env_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         retval = saveenv(dev, 0);
         break;
     }
+    case ENV_IOCLOCK: {
+        if ( down_interruptible(&dev->sem)) {
+            return -ERESTARTSYS;
+        }
+        saveenv(dev, 1);
+        dev->locked = 1;
+        up(&dev->sem);
+        break;
+    }
+    case ENV_IOCUNLOCK: {
+        if ( down_interruptible(&dev->sem)) {
+            return -ERESTARTSYS;
+        }
+        dev->locked = 0;
+        up(&dev->sem);
+        break;
+    }
     default:
         return -ENOTTY;
     }
@@ -769,19 +837,24 @@ static void env_exit(void)
 
 static __init int env_init(void)
 {
-    int ret = misc_register(&env_miscdev);
-    if (ret) {
-        ret = -ENODEV;
-        goto fail;
-    }
+    int ret = 0;
+
 
     g_env_dev = kzalloc(sizeof(env_dev_t), GFP_KERNEL);
     if (!g_env_dev) {
         ret = -ENOMEM;
         goto fail;
     }
-
+    
+    g_env_dev->locked = 0;
+    
     sema_init(&g_env_dev->sem, 1);
+    
+    ret = misc_register(&env_miscdev);
+    if (ret) {
+        ret = -ENODEV;
+        goto fail;
+    }
 
     return 0;
 

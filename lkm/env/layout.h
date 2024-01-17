@@ -66,6 +66,18 @@ static env_layout_t g_env_layout[] =
         .size = 0x2000, // 8KB
         .flag = ENV_WO,
     },
+    {
+        .name = "userb",
+        .offset = 0xA000,
+        .size = 0x2000, // 8KB
+        .flag = ENV_WO,
+    },
+    {
+        .name = "point",
+        .offset = 0xC000,
+        .size = 0x1000, // 4KB
+        .flag = ENV_WO,
+    },
 };
 
 #endif /* __LAYOUT_H__ */

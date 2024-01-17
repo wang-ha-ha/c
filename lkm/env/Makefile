@@ -1,7 +1,7 @@
 ARCH ?= mips
 CROSS_COMPILE ?= mips-linux-gnu-
 
-KDIR ?= $(PWD)/../../../os/kernel/kernel-4.4.94
+KDIR ?= $(ZRT_ENV_KERNEL_DIR)
 MODULE_NAME := env-flash
 
 all: modules
@@ -16,3 +16,7 @@ modules:
 
 clean:
 	@rm -rf *.o *~ .depend .*.cmd  *.mod.c .tmp_versions *.ko *.symvers modules.order
+
+release:
+	mkdir -p ../modules/${ZRT_ENV_TOOL_CHAIN}/$(subst _,.,${ZRT_ENV_LINUX_VERSION})
+	cp ${MODULE_NAME}.ko ../modules/${ZRT_ENV_TOOL_CHAIN}/$(subst _,.,${ZRT_ENV_LINUX_VERSION})

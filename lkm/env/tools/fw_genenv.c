@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
 
     memcpy(env_buf,(unsigned *)&crc,4);
 
-    save_file(argv[3],env_buf,env_len + 4);
+    save_file(argv[3],env_buf,section_size);
 
     free(env_buf);
     free(para_file_buf);

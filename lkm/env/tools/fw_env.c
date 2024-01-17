@@ -14,13 +14,15 @@
 #include "layout.h"
 
 #define ENV_IOC_MAGIC    'e'
-#define ENV_IOC_MAXNR    5
+#define ENV_IOC_MAXNR    7
 #define ENV_IOCGET        _IOR(ENV_IOC_MAGIC, 0, unsigned long)
 #define ENV_IOCSET        _IOW(ENV_IOC_MAGIC, 1, unsigned long)
-#define ENV_IOCUNSET    _IOW(ENV_IOC_MAGIC, 2, unsigned long)
+#define ENV_IOCUNSET      _IOW(ENV_IOC_MAGIC, 2, unsigned long)
 #define ENV_IOCCLR        _IOW(ENV_IOC_MAGIC, 3, unsigned long)
 #define ENV_IOCPRT        _IOR(ENV_IOC_MAGIC, 4, unsigned long)
-#define ENV_IOCSAVE        _IOR(ENV_IOC_MAGIC, 5, unsigned long)
+#define ENV_IOCSAVE       _IOR(ENV_IOC_MAGIC, 5, unsigned long)
+#define ENV_IOCLOCK       _IOR(ENV_IOC_MAGIC, 6, unsigned long)
+#define ENV_IOCUNLOCK     _IOR(ENV_IOC_MAGIC, 7, unsigned long)
 
 #define ENV_NAME_MAXLEN 64
 typedef struct env_ioctl_args {
@@ -195,6 +197,20 @@ int fw_env_save(void)
     return ioctl(dev_fd, ENV_IOCSAVE, NULL);
 }
 
+int fw_env_lock(void)
+{
+    CHECK_ENV_OPEN();
+
+    return ioctl(dev_fd, ENV_IOCLOCK, NULL);
+}
+
+int fw_env_unlock(void)
+{
+    CHECK_ENV_OPEN();
+
+    return ioctl(dev_fd, ENV_IOCUNLOCK, NULL);
+}
+
 /* Parse LINE argument in "name=value" format, and set NAME and VALUE pointers.
    It removes preceding and following zeros by changing data in LINE.
    Empty line and # line will be skipped. */
@@ -327,12 +343,17 @@ void fw_setenv(int argc, char *argv[])
         } else {
             fw_env_set(argv[1], argv[2], argv[3], 1);
         }
-    }
-    else if(argc == 3) {
+    } else if(argc == 3) {
         if (strcmp(argv[1], "-c") == 0){
             fw_env_clear(argv[2]);
         }else{
             fw_env_unset(argv[1], argv[2]);
+        }
+    } else if(argc == 2) {
+        if (strcmp(argv[1], "lock") == 0){
+            fw_env_lock();
+        } else if (strcmp(argv[1], "unlock") == 0){
+            fw_env_unlock();
         }
     } else {
         usage();
