@@ -76,7 +76,7 @@ int main(int argc, char **argv)
         ringbuf_stream *msg;
     restart:
         msg = (ringbuf_stream *)g_msg_buf;
-        printf("frame_len:%d,type:%d,seq:%d,len:%d\n",msg->frame_len,msg->type,msg->seq,msg->len);
+        // printf("frame_len:%d,type:%d,seq:%d,len:%d\n",msg->frame_len,msg->type,msg->seq,msg->len);
         if(msg->type != 0){
             char *stream_buf = (char *) malloc(msg->frame_len);
             if(stream_buf == NULL) {

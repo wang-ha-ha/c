@@ -60,7 +60,7 @@ int ringbuf_read_block(ringbuf *ringbuf,char *buf,int len)
 
 int ringbuf_get_free_num(ringbuf *ringbuf)
 {
-    printf("%d=%d\n", ringbuf->head, ringbuf->tail);
+    // printf("%d=%d\n", ringbuf->head, ringbuf->tail);
     if(ringbuf->head <= ringbuf->tail)
         return ringbuf->head - ringbuf->tail - 1 + ringbuf->len;
     return ringbuf->len - ringbuf->head - ringbuf->tail - 1;

@@ -106,7 +106,7 @@ int main(int argc, char **argv)
         ringbuf_stream *msg = (ringbuf_stream *)g_msg_buf;
         msg->timestamp = time(NULL);
         msg->frame_len = send_len;
-        printf("frame_len:%d,type:%d,seq:%d--rb_free_num:%d\n",msg->frame_len,type,seq,rb_free_num);
+        // printf("frame_len:%d,type:%d,seq:%d--rb_free_num:%d\n",msg->frame_len,type,seq,rb_free_num);
         while(real_send < send_len) {
             msg->len = remain_send > (4096 - sizeof(ringbuf_stream)) ? (4096 - sizeof(ringbuf_stream)) : remain_send;
             msg->seq = seq;
