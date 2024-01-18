@@ -61,7 +61,7 @@ char * ipc_msg_queue_send(ipc_msg_queue *ipc_msg_queue,int recv_type,char *buf,i
     int count = 0;
     if(len > ipc_msg_queue->max_size) {
         printf("ipc_msg_queue_send msg is big\n");
-        return -1;
+        return NULL;
     }
     msq_msg *msg = (msq_msg *)ipc_msg_queue->send_buf;
     msg->type = _IPC_MSG_QUEUE_TYPE;
@@ -120,7 +120,7 @@ int ipc_msg_queue_recv_loop(ipc_msg_queue *ipc_msg_queue,char * (*fn)(char *,int
             continue;
         }
         
-        printf("recv:seq:%d,type:%ld,ret:%d,%s\n", msg->seq,msg->type,ret, msg->p_buf);
+        printf("recv:msg->recv_type:%d,seq:%d,type:%ld,ret:%d,%s\n",msg->recv_type, msg->seq,msg->type,ret, msg->p_buf);
 
         msg->type = msg->recv_type;
         int response_len = 0;

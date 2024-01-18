@@ -3,3 +3,5 @@ sm_read
 sm_write
 share_push_stream/test_read
 share_push_stream/test_write
+ipc_msg/test_read
+ipc_msg/test_write
