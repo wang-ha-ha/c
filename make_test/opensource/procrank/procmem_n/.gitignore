@@ -1,0 +1,8 @@
+*~
+/.mypy_cache/
+/.pylint/
+/dist/
+/procmem.egg-info/
+/result
+/src/
+__pycache__/
