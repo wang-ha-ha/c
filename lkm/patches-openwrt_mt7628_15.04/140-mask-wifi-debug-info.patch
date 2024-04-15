@@ -1,0 +1,26 @@
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
+@@ -73,7 +73,7 @@ static void mt7628_switch_channel(RTMP_A
+ 	doReload = (doCal1 & (0x1 << 7)) >> 7;
+ 	if (scan == FALSE)
+ 	{
+-		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_ERROR, ("reload DPD from flash , 0x9F = [%04x] doReload bit7[%x]\n", doCal1, doReload));
++		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_TRACE, ("reload DPD from flash , 0x9F = [%04x] doReload bit7[%x]\n", doCal1, doReload));
+ 		/* reload DPD cal data from flash  , follow primary channel -by CSD */
+ 		CmdLoadDPDDataFromFlash(pAd, pAd->CommonCfg.Channel, doReload);  
+ 	}
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/mcu/andes_mt.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/mcu/andes_mt.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/mcu/andes_mt.c
+@@ -4621,7 +4621,7 @@ INT32 CmdLoadDPDDataFromFlash(RTMP_ADAPT
+ 		goto error;
+ 	}
+ 	
+-	MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_ERROR, 
++	MTWF_LOG(DBG_CAT_ALL, DBG_LVL_TRACE, DBG_LVL_ERROR, 
+ 	("%s: Channel = %d, DoReload = %d\n", __FUNCTION__, channel, doReload));
+ 
+ 	msg = AndesAllocCmdMsg(pAd, sizeof(CmdLoadDPD));

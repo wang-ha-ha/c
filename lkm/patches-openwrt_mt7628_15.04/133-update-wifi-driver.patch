@@ -1,0 +1,115 @@
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/ba_action.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/ba_action.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/ba_action.c
+@@ -389,57 +389,48 @@ static void ba_refresh_reordering_mpdus(
+ 
+ /* static */
+ void ba_flush_reordering_timeout_mpdus(
+-									IN PRTMP_ADAPTER    pAd, 
+-									IN PBA_REC_ENTRY    pBAEntry,
+-									IN ULONG            Now32)
++		IN PRTMP_ADAPTER    pAd, 
++		IN PBA_REC_ENTRY    pBAEntry,
++		IN ULONG            Now32)
+ 
+ {
+ 	USHORT Sequence;
+ 
+-    if ((pBAEntry == NULL) || (pBAEntry->list.qlen <= 0))
+-        return;
++	if ((pBAEntry == NULL) || (pBAEntry->list.qlen <= 0))
++		return;
+ 
+-/*	if ((RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+REORDERING_PACKET_TIMEOUT)) &&*/
+-/*		 (pBAEntry->list.qlen > ((pBAEntry->BAWinSize*7)/8))) ||*/
+-/*		(RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(10*REORDERING_PACKET_TIMEOUT))) &&*/
+-/*		 (pBAEntry->list.qlen > (pBAEntry->BAWinSize/8)))*/
++	/*	if ((RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+REORDERING_PACKET_TIMEOUT)) &&*/
++	/*		 (pBAEntry->list.qlen > ((pBAEntry->BAWinSize*7)/8))) ||*/
++	/*		(RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(10*REORDERING_PACKET_TIMEOUT))) &&*/
++	/*		 (pBAEntry->list.qlen > (pBAEntry->BAWinSize/8)))*/
+ 	if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(MAX_REORDERING_PACKET_TIMEOUT/6))) 
+-		 &&(pBAEntry->list.qlen > 0 /*1*/)
+-		)
++			&&(pBAEntry->list.qlen > 0 /*1*/)
++	   )
+ 	{
+ 		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_TRACE,("timeout[%d] (%08lx-%08lx = %d > %d): %x, flush all!\n ", pBAEntry->list.qlen, Now32, (pBAEntry->LastIndSeqAtTimer), 
+-			   (int)((long) Now32 - (long)(pBAEntry->LastIndSeqAtTimer)), MAX_REORDERING_PACKET_TIMEOUT,
+-			   pBAEntry->LastIndSeq));
++					(int)((long) Now32 - (long)(pBAEntry->LastIndSeqAtTimer)), MAX_REORDERING_PACKET_TIMEOUT,
++					pBAEntry->LastIndSeq));
+ 		ba_refresh_reordering_mpdus(pAd, pBAEntry);
+ 		pBAEntry->LastIndSeqAtTimer = Now32;
+ 	}
+-	else
+-	if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(pAd->BATable.ba_reordering_packet_timeout)))
+-		&& (pBAEntry->list.qlen > 0)
+-	   )
++	/*else if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(pAd->BATable.ba_reordering_packet_timeout)))
++				&& (pBAEntry->list.qlen > 0)
++		   )
+ 		{
+-/*
+-		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("timeout[%d] (%lx-%lx = %d > %d): %x, ", pBAEntry->list.qlen, Now32, (pBAEntry->LastIndSeqAtTimer),
+-			   (int)((long) Now32 - (long)(pBAEntry->LastIndSeqAtTimer)), REORDERING_PACKET_TIMEOUT,
+-			   pBAEntry->LastIndSeq));
+-*/
+-    		
+-		/* force LastIndSeq to shift to LastIndSeq+1*/
+-    		Sequence = (pBAEntry->LastIndSeq+1) & MAXSEQ;
+-    		ba_indicate_reordering_mpdus_le_seq(pAd, pBAEntry, Sequence);
+-    		pBAEntry->LastIndSeqAtTimer = Now32;
++			Sequence = (pBAEntry->LastIndSeq+1) & MAXSEQ;
++			ba_indicate_reordering_mpdus_le_seq(pAd, pBAEntry, Sequence);
++			pBAEntry->LastIndSeqAtTimer = Now32;
+ 			pBAEntry->LastIndSeq = Sequence;
+-    		
+-    		/* indicate in-order mpdus*/
+-    		Sequence = ba_indicate_reordering_mpdus_in_order(pAd, pBAEntry, Sequence);
+-    		if (Sequence != RESET_RCV_SEQ)
+-    		{
+-    			pBAEntry->LastIndSeq = Sequence;
+-    		}
+ 
+-		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("%x, flush one!\n", pBAEntry->LastIndSeq));
++			Sequence = ba_indicate_reordering_mpdus_in_order(pAd, pBAEntry, Sequence);
++			if (Sequence != RESET_RCV_SEQ)
++			{
++				pBAEntry->LastIndSeq = Sequence;
++			}
+ 
+-	}
++			MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("%x, flush one!\n", pBAEntry->LastIndSeq));
++
++		}*/
+ }
+ 
+ 
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
+@@ -481,7 +481,7 @@ EXTRA_CFLAGS += -DENHANCED_STAT_DISPLAY
+ EXTRA_CFLAGS += -DFIFO_EXT_SUPPORT
+ EXTRA_CFLAGS += -DMCS_LUT_SUPPORT
+ EXTRA_CFLAGS += -DUSE_BMC -DTHERMAL_PROTECT_SUPPORT -DCAL_FREE_IC_SUPPORT -DTRAFFIC_BASED_TXOP
+-EXTRA_CFLAGS += -DDATA_QUEUE_RESERVE -DEAPOL_QUEUE_SUPPORT -DDMA_RESET_SUPPORT -DWTBL_RATE_DEBUG -DCONFIG_BA_REORDER_MONITOR
++EXTRA_CFLAGS += -DDATA_QUEUE_RESERVE -DEAPOL_QUEUE_SUPPORT -DDMA_RESET_SUPPORT -DWTBL_RATE_DEBUG
+ EXTRA_CFLAGS += -DEDCCA_RB
+ 
+ chip_objs += $(SRC_DIR)/../chips/mt7628.o\
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile.ap.mt
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile.ap.mt
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile.ap.mt
+@@ -413,7 +413,7 @@ EXTRA_CFLAGS += -DENHANCED_STAT_DISPLAY
+ EXTRA_CFLAGS += -DFIFO_EXT_SUPPORT
+ EXTRA_CFLAGS += -DMCS_LUT_SUPPORT
+ EXTRA_CFLAGS += -DUSE_BMC -DTHERMAL_PROTECT_SUPPORT -DCAL_FREE_IC_SUPPORT -DTRAFFIC_BASED_TXOP
+-EXTRA_CFLAGS += -DDATA_QUEUE_RESERVE -DEAPOL_QUEUE_SUPPORT -DDMA_RESET_SUPPORT -DWTBL_RATE_DEBUG -DCONFIG_BA_REORDER_MONITOR
++EXTRA_CFLAGS += -DDATA_QUEUE_RESERVE -DEAPOL_QUEUE_SUPPORT -DDMA_RESET_SUPPORT
+ EXTRA_CFLAGS += -DEDCCA_RB
+ 
+ chip_objs += $(MT_WIFI_DIR)/../chips/mt7628.o\

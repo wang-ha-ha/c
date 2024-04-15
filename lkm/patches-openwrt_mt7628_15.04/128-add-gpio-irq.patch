@@ -1,0 +1,337 @@
+Index: linux-3.10.108/arch/mips/Kconfig
+===================================================================
+--- linux-3.10.108.orig/arch/mips/Kconfig
++++ linux-3.10.108/arch/mips/Kconfig
+@@ -119,6 +119,7 @@ config RALINK_MT7628
+         select SYS_HAS_CPU_MIPS32_R2
+ 	select SYS_SUPPORTS_LITTLE_ENDIAN
+ 	select ARCH_REQUIRE_GPIOLIB
++	select IRQ_DOMAIN
+ 	select BOOT_ELF32 if !SUPPORT_OPENWRT
+ 	select BOOT_RAW if SUPPORT_OPENWRT
+ 	select SYS_SUPPORTS_32BIT_KERNEL
+Index: linux-3.10.108/drivers/gpio/gpio-mt7621.c
+===================================================================
+--- linux-3.10.108.orig/drivers/gpio/gpio-mt7621.c
++++ linux-3.10.108/drivers/gpio/gpio-mt7621.c
+@@ -19,6 +19,7 @@
+ #include <linux/slab.h>
+ 
+ #include <asm/mach-ralink/rt_mmap.h>
++#include <asm/mach-ralink/surfboardint.h>
+ 
+ #define MTK_MAX_BANK		3
+ #define MTK_BANK_WIDTH		32
+@@ -38,7 +39,7 @@ enum mediatek_gpio_reg {
+ };
+ 
+ static void __iomem *mediatek_gpio_membase = RALINK_PIO_BASE;
+-static int mediatek_gpio_irq;
++static int mediatek_gpio_irq = SURFBOARDINT_GPIO;
+ static struct irq_domain *mediatek_gpio_irq_domain;
+ static atomic_t irq_refcount = ATOMIC_INIT(0);
+ 
+@@ -145,13 +146,13 @@ mediatek_gpio_get_direction(struct gpio_
+ 	return 1;
+ }
+ 
+-// static int
+-// mediatek_gpio_to_irq(struct gpio_chip *chip, unsigned pin)
+-// {
+-// 	struct mtk_gc *rg = to_mediatek_gpio(chip);
++static int
++mediatek_gpio_to_irq(struct gpio_chip *chip, unsigned pin)
++{
++	struct mtk_gc *rg = to_mediatek_gpio(chip);
+ 
+-// 	return irq_create_mapping(mediatek_gpio_irq_domain, pin + (rg->bank * MTK_BANK_WIDTH));
+-// }
++	return irq_create_mapping(mediatek_gpio_irq_domain, pin + (rg->bank * MTK_BANK_WIDTH));
++}
+ 
+ static int
+ mediatek_gpio_add_bank(int bank)
+@@ -161,7 +162,7 @@ mediatek_gpio_add_bank(int bank)
+ 	if (!rg)
+ 		return -ENOMEM;
+ 
+-	// gc_map[be32_to_cpu(*id)] = rg;
++	gc_map[bank] = rg;
+ 
+ 	memset(rg, 0, sizeof(struct mtk_gc));
+ 
+@@ -176,8 +177,8 @@ mediatek_gpio_add_bank(int bank)
+ 	rg->chip.get_direction = mediatek_gpio_get_direction;
+ 	rg->chip.get = mediatek_gpio_get;
+ 	rg->chip.set = mediatek_gpio_set;
+-	// if (mediatek_gpio_irq_domain)
+-	// 	rg->chip.to_irq = mediatek_gpio_to_irq;
++	if (mediatek_gpio_irq_domain)
++		rg->chip.to_irq = mediatek_gpio_to_irq;
+ 	rg->bank = bank;
+ 
+ 	/* set polarity to low for all gpios */
+@@ -188,134 +189,145 @@ mediatek_gpio_add_bank(int bank)
+ 	return gpiochip_add(&rg->chip);
+ }
+ 
+-// static void
+-// mediatek_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+-// {
+-// 	int i;
+-
+-// 	for (i = 0; i < MTK_MAX_BANK; i++) {
+-// 		struct mtk_gc *rg = gc_map[i];
+-// 		unsigned long pending;
+-// 		int bit;
+-
+-// 		if (!rg)
+-// 			continue;
+-
+-// 		pending = mtk_gpio_r32(rg, GPIO_REG_STAT);
+-
+-// 		for_each_set_bit(bit, &pending, MTK_BANK_WIDTH) {
+-// 			u32 map = irq_find_mapping(mediatek_gpio_irq_domain, (MTK_BANK_WIDTH * i) + bit);
+-
+-// 			generic_handle_irq(map);
+-// 			mtk_gpio_w32(rg, GPIO_REG_STAT, BIT(bit));
+-// 		}
+-// 	}
+-// }
+-
+-// static void
+-// mediatek_gpio_irq_unmask(struct irq_data *d)
+-// {
+-// 	int pin = d->hwirq;
+-// 	int bank = pin / 32;
+-// 	struct mtk_gc *rg = gc_map[bank];
+-// 	unsigned long flags;
+-// 	u32 rise, fall;
+-
+-// 	if (!rg)
+-// 		return;
+-
+-// 	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
+-// 	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
+-
+-// 	spin_lock_irqsave(&rg->lock, flags);
+-// 	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise | (BIT(d->hwirq) & rg->rising));
+-// 	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall | (BIT(d->hwirq) & rg->falling));
+-// 	spin_unlock_irqrestore(&rg->lock, flags);
+-// }
+-
+-// static void
+-// mediatek_gpio_irq_mask(struct irq_data *d)
+-// {
+-// 	int pin = d->hwirq;
+-// 	int bank = pin / 32;
+-// 	struct mtk_gc *rg = gc_map[bank];
+-// 	unsigned long flags;
+-// 	u32 rise, fall;
+-
+-// 	if (!rg)
+-// 		return;
+-
+-// 	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
+-// 	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
+-
+-// 	spin_lock_irqsave(&rg->lock, flags);
+-// 	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall & ~BIT(d->hwirq));
+-// 	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise & ~BIT(d->hwirq));
+-// 	spin_unlock_irqrestore(&rg->lock, flags);
+-// }
+-
+-// static int
+-// mediatek_gpio_irq_type(struct irq_data *d, unsigned int type)
+-// {
+-// 	int pin = d->hwirq;
+-// 	int bank = pin / 32;
+-// 	struct mtk_gc *rg = gc_map[bank];
+-// 	u32 mask = BIT(d->hwirq);
+-
+-// 	if (!rg)
+-// 		return -1;
+-
+-// 	if (type == IRQ_TYPE_PROBE) {
+-// 		if ((rg->rising | rg->falling) & mask)
+-// 			return 0;
+-
+-// 		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+-// 	}
+-
+-// 	if (type & IRQ_TYPE_EDGE_RISING)
+-// 		rg->rising |= mask;
+-// 	else
+-// 		rg->rising &= ~mask;
+-
+-// 	if (type & IRQ_TYPE_EDGE_FALLING)
+-// 		rg->falling |= mask;
+-// 	else
+-// 		rg->falling &= ~mask;
+-
+-// 	return 0;
+-// }
+-
+-// static struct irq_chip mediatek_gpio_irq_chip = {
+-// 	.name		= "GPIO",
+-// 	.irq_unmask	= mediatek_gpio_irq_unmask,
+-// 	.irq_mask	= mediatek_gpio_irq_mask,
+-// 	.irq_mask_ack	= mediatek_gpio_irq_mask,
+-// 	.irq_set_type	= mediatek_gpio_irq_type,
+-// };
+-
+-// static int
+-// mediatek_gpio_gpio_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
+-// {
+-// 	irq_set_chip_and_handler(irq, &mediatek_gpio_irq_chip, handle_level_irq);
+-// 	irq_set_handler_data(irq, d);
+-
+-// 	return 0;
+-// }
+-
+-// static const struct irq_domain_ops irq_domain_ops = {
+-// 	.xlate = irq_domain_xlate_onecell,
+-// 	.map = mediatek_gpio_gpio_map,
+-// };
++static void
++mediatek_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	int i;
++
++	for (i = 0; i < MTK_MAX_BANK; i++) {
++		struct mtk_gc *rg = gc_map[i];
++		unsigned long pending;
++		int bit;
++
++		if (!rg)
++			continue;
++
++		pending = mtk_gpio_r32(rg, GPIO_REG_STAT);
++
++		for_each_set_bit(bit, &pending, MTK_BANK_WIDTH) {
++			u32 map = irq_find_mapping(mediatek_gpio_irq_domain, (MTK_BANK_WIDTH * i) + bit);
++
++			generic_handle_irq(map);
++			mtk_gpio_w32(rg, GPIO_REG_STAT, BIT(bit));
++		}
++	}
++}
++
++static void
++mediatek_gpio_irq_unmask(struct irq_data *d)
++{
++	int pin = d->hwirq;
++	int bank = pin / 32;
++	struct mtk_gc *rg = gc_map[bank];
++	unsigned long flags;
++	u32 rise, fall;
++
++	if (!rg)
++		return;
++
++	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
++	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
++
++	spin_lock_irqsave(&rg->lock, flags);
++	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise | (BIT(d->hwirq) & rg->rising));
++	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall | (BIT(d->hwirq) & rg->falling));
++	spin_unlock_irqrestore(&rg->lock, flags);
++}
++
++static void
++mediatek_gpio_irq_mask(struct irq_data *d)
++{
++	int pin = d->hwirq;
++	int bank = pin / 32;
++	struct mtk_gc *rg = gc_map[bank];
++	unsigned long flags;
++	u32 rise, fall;
++
++	if (!rg)
++		return;
++
++	rise = mtk_gpio_r32(rg, GPIO_REG_REDGE);
++	fall = mtk_gpio_r32(rg, GPIO_REG_FEDGE);
++
++	spin_lock_irqsave(&rg->lock, flags);
++	mtk_gpio_w32(rg, GPIO_REG_FEDGE, fall & ~BIT(d->hwirq));
++	mtk_gpio_w32(rg, GPIO_REG_REDGE, rise & ~BIT(d->hwirq));
++	spin_unlock_irqrestore(&rg->lock, flags);
++}
++
++static int
++mediatek_gpio_irq_type(struct irq_data *d, unsigned int type)
++{
++	int pin = d->hwirq;
++	int bank = pin / 32;
++	struct mtk_gc *rg = gc_map[bank];
++	u32 mask = BIT(d->hwirq);
++
++	if (!rg)
++		return -1;
++
++	if (type == IRQ_TYPE_PROBE) {
++		if ((rg->rising | rg->falling) & mask)
++			return 0;
++
++		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
++	}
++
++	if (type & IRQ_TYPE_EDGE_RISING)
++		rg->rising |= mask;
++	else
++		rg->rising &= ~mask;
++
++	if (type & IRQ_TYPE_EDGE_FALLING)
++		rg->falling |= mask;
++	else
++		rg->falling &= ~mask;
++
++	return 0;
++}
++
++static struct irq_chip mediatek_gpio_irq_chip = {
++	.name		= "GPIO",
++	.irq_unmask	= mediatek_gpio_irq_unmask,
++	.irq_mask	= mediatek_gpio_irq_mask,
++	.irq_mask_ack	= mediatek_gpio_irq_mask,
++	.irq_set_type	= mediatek_gpio_irq_type,
++};
++
++static int
++mediatek_gpio_gpio_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
++{
++	irq_set_chip_and_handler(irq, &mediatek_gpio_irq_chip, handle_level_irq);
++	irq_set_handler_data(irq, d);
++
++	return 0;
++}
++
++static const struct irq_domain_ops irq_domain_ops = {
++	.xlate = irq_domain_xlate_onecell,
++	.map = mediatek_gpio_gpio_map,
++};
+ 
+ static int __init
+ mediatek_gpio_init(void)
+ {
+     int i;
+ 
++	if (mediatek_gpio_irq) {
++		mediatek_gpio_irq_domain = irq_domain_add_linear(NULL,
++			MTK_MAX_BANK * MTK_BANK_WIDTH,
++			&irq_domain_ops, NULL);
++		if (!mediatek_gpio_irq_domain)
++			printk("irq_domain_add_linear failed\n");
++	}
++
+     for(i = 0; i < MTK_MAX_BANK;i++){
+         mediatek_gpio_add_bank(i);
+     }
+ 
++	if (mediatek_gpio_irq_domain)
++		irq_set_chained_handler(mediatek_gpio_irq, mediatek_gpio_irq_handler);
++
+ 	return 0;
+ }
+ 

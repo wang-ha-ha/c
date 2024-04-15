@@ -1,0 +1,36 @@
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/chips/mt7628.c
+@@ -1169,7 +1169,7 @@ void mt7628_set_ed_cca(RTMP_ADAPTER *pAd
+ {
+ 	
+ 	UINT32 macVal = 0, macVal2 = 0;	
+-	UINT32 macVal3 = 0;
++	// UINT32 macVal3 = 0;
+ 	UINT32 NBIDmacVal = 0;
+ 
+ 	RTMP_IO_READ32(pAd, WF_PHY_BASE + 0x0634, &macVal2);
+@@ -1197,7 +1197,7 @@ void mt7628_set_ed_cca(RTMP_ADAPTER *pAd
+ 		* disable PSE RESET.
+ 		* For MAP set ED threshold to -20dbm(0xd7e82a10);
+ 		*/
+-		macVal = 0xd7e82a10;
++		macVal = 0xD7083F0F;
+ 		RTMP_IO_WRITE32(pAd, WF_PHY_BASE + 0x0618, macVal);
+ 
+ 		macVal2 &= 0xFFFFFFFE;
+@@ -1210,9 +1210,10 @@ void mt7628_set_ed_cca(RTMP_ADAPTER *pAd
+ 		MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_ERROR, ("%s: TURN OFF EDCCA  mac 0x10618 = 0x%x\n", __FUNCTION__, macVal));
+ #endif /* SMART_CARRIER_SENSE_SUPPORT */
+ 		
+-		RTMP_IO_READ32(pAd, TMAC_TRCR, &macVal3);
+-		macVal3 |= 0xc0000000;
+-		RTMP_IO_WRITE32(pAd, TMAC_TRCR, macVal3);
++		// RTMP_IO_READ32(pAd, TMAC_TRCR, &macVal3);
++		// macVal3 |= 0xc0000000;
++		// RTMP_IO_WRITE32(pAd, TMAC_TRCR, macVal3);
++		//	printk("WCQ=====TEST=====RVR\n");
+ 	}
+ 	
+ 	if (strncmp(pAd->CommonCfg.CountryCode, "JP", 2) == 0)

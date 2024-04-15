@@ -1,0 +1,63 @@
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/include/rtmp.h
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/include/rtmp.h
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/include/rtmp.h
+@@ -6010,6 +6010,8 @@ struct _RTMP_ADAPTER {
+ 	UCHAR bMAPQuickChChangeEn;
+ #endif /* MAP_SUPPORT */
+ 	UCHAR reg_domain;
++	UINT32 BeaconTxCntMonitor; //guozhitest
++	UINT32 BeaconTxMonitor; //wcq
+ };
+ 
+ #if defined(RTMP_INTERNAL_TX_ALC) || defined(RTMP_TEMPERATURE_COMPENSATION)
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/hw_ctrl/cmm_chip_mt.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/hw_ctrl/cmm_chip_mt.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/hw_ctrl/cmm_chip_mt.c
+@@ -1044,8 +1044,29 @@ BOOLEAN MonitorTxBcnRxPse(RTMP_ADAPTER *
+ VOID PSEWatchDog(RTMP_ADAPTER *pAd)
+ {
+ 	BOOLEAN NoDataIn = FALSE;
+-
++	UINT32 mac_val;
+ 	NoDataIn = MonitorRxPse(pAd);
++	RTMP_IO_READ32(pAd, MIB_MSDR0, &mac_val);
++	// MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("Channel=%d\n", pAd->ScanCtrl.Channel));
++	// MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("ATECtrl=%d\n", pAd->ATECtrl.Mode));
++	if(pAd->BeaconTxMonitor == 1 && pAd->ScanCtrl.Channel == 0 && pAd->ATECtrl.Mode == ATE_STOP)
++	{
++		if(mac_val==0)  //guozhitest
++		{
++			pAd->BeaconTxCntMonitor++;      
++			if(pAd->BeaconTxCntMonitor>100)
++			{
++				MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("\tBeaconTxCnt=0x%x\n", pAd->BeaconTxCntMonitor));
++				pAd->BeaconTxCntMonitor=0;
++				goto reset;
++			}
++		}
++		else
++		{
++			pAd->BeaconTxCntMonitor=0;
++		}
++		// MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("\tBeaconTxCnt=0x%x,BeaconTxCntMonitor=%d\n", mac_val,pAd->BeaconTxCntMonitor));
++	}
+ 
+ 	if (((NoDataIn)
+ #ifdef DMA_RESET_SUPPORT		
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/rtmp_init_inf.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/rtmp_init_inf.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/rtmp_init_inf.c
+@@ -571,7 +571,9 @@ int rt28xx_init(VOID *pAdSrc, RTMP_STRIN
+ 
+ 
+ 	DBGPRINT_S(("<==== rt28xx_init, Status=%x\n", Status));
+-
++	
++	pAd->BeaconTxMonitor = 1; //add wcq
++	
+ 	return TRUE;
+ 
+ #ifdef CONFIG_ATE

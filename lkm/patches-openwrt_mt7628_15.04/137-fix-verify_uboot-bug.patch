@@ -1,0 +1,21 @@
+Index: linux-3.10.108/drivers/mtd/ralink/winbond_flash_otp.c
+===================================================================
+--- linux-3.10.108.orig/drivers/mtd/ralink/winbond_flash_otp.c
++++ linux-3.10.108/drivers/mtd/ralink/winbond_flash_otp.c
+@@ -633,10 +633,14 @@ static long flash_otp_unlocked_ioctl(str
+     switch (cmd) {
+         case FLASHOTPLOCK:{
+             int sector;
+-            if (copy_from_user(&sector, argp, sizeof(int)))
++            printk("WCQ====\n");
++            if (copy_from_user(&sector, argp, sizeof(int))){
++                mutex_unlock(&flash_otp_mutex);
+                 return -EFAULT;
+-
++            }
++            printk("WCQ====sector:%d\n",sector);
+             if(raspi_otp_lock(sector) != 0){
++                mutex_unlock(&flash_otp_mutex);
+                 return -EINVAL;
+             }
+ 

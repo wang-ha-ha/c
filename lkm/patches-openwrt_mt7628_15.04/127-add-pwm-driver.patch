@@ -1,0 +1,373 @@
+Index: linux-3.10.108/arch/mips/include/asm/mach-ralink/rt_mmap.h
+===================================================================
+--- linux-3.10.108.orig/arch/mips/include/asm/mach-ralink/rt_mmap.h
++++ linux-3.10.108/arch/mips/include/asm/mach-ralink/rt_mmap.h
+@@ -711,6 +711,7 @@
+ #define RALINK_PIO_BASE			0xB0000600
+ #define RALINK_SPI_SLAVE_BASE		0xB0000700
+ #define RALINK_I2C_BASE			0xB0000900
++#define RALINK_PWM_BASE		    0xB0005000
+ #define RALINK_I2S_BASE			0xB0000A00
+ #define RALINK_SPI_BASE			0xB0000B00
+ #define RALINK_UART_LITE1_BASE		0x10000C00
+Index: linux-3.10.108/drivers/leds/Kconfig
+===================================================================
+--- linux-3.10.108.orig/drivers/leds/Kconfig
++++ linux-3.10.108/drivers/leds/Kconfig
+@@ -113,6 +113,12 @@ config LEDS_FSG
+ 	help
+ 	  This option enables support for the LEDs on the Freecom FSG-3.
+ 
++config LEDS_MTK
++	tristate "MTK LED Device"
++	depends on LEDS_CLASS
++	help
++	  MTK LED Device.
++
+ config LEDS_WRAP
+ 	tristate "LED Support for the WRAP series LEDs"
+ 	depends on LEDS_CLASS
+Index: linux-3.10.108/drivers/leds/Makefile
+===================================================================
+--- linux-3.10.108.orig/drivers/leds/Makefile
++++ linux-3.10.108/drivers/leds/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_LEDS_RENESAS_TPU)		+= leds-
+ obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
+ obj-$(CONFIG_LEDS_LM355x)		+= leds-lm355x.o
+ obj-$(CONFIG_LEDS_BLINKM)		+= leds-blinkm.o
++obj-$(CONFIG_LEDS_MTK)			+= leds-mtk.o
+ 
+ # LED SPI Drivers
+ obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
+Index: linux-3.10.108/drivers/leds/leds-mtk.c
+===================================================================
+--- /dev/null
++++ linux-3.10.108/drivers/leds/leds-mtk.c
+@@ -0,0 +1,87 @@
++#include <linux/errno.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include <linux/platform_device.h>
++#include <linux/leds_pwm.h>
++#include <linux/device.h>
++#include <linux/mm.h>
++#include <linux/err.h>
++#include <linux/sched.h>
++#include <linux/mutex.h>
++#include <linux/backing-dev.h>
++#include <linux/compat.h>
++#include <linux/mount.h>
++#include <linux/blkpg.h>
++#include <linux/magic.h>
++#include <asm/uaccess.h>
++#include <linux/pwm.h>
++
++#define PWM_DRV_NAME "mt-pwm"
++
++struct led_pwm mt_leds[3] = {
++	[0] = { 
++		.name = "red",
++		.default_trigger = "default-on",
++		.pwm_id = 0,
++		.max_brightness = 100,
++		.pwm_period_ns = 7812500,
++	},
++	[1] = {
++		.name = "green",
++		.default_trigger = "none",
++		.pwm_id = 1,
++		.max_brightness = 100,
++		.pwm_period_ns = 7812500,
++	},
++	[2] = {
++		.name = "blue",
++		.default_trigger = "none",
++		.pwm_id = 2,
++		.max_brightness = 100,
++		.pwm_period_ns = 7812500,
++	}
++};
++
++struct led_pwm_platform_data mt_leds_data = {
++	.num_leds = 3,
++	.leds = mt_leds,
++};
++
++struct platform_device_info mt_leds_info = {
++	.name			= "leds_pwm",
++	.id				= 0,
++	.res			= NULL,
++	.data			= &mt_leds_data,
++	.size_data		= sizeof(mt_leds_data),
++};
++
++struct platform_device *mtk_leds_device;
++
++
++static s32 __init mt_leds_init(void)
++{
++	mtk_leds_device = platform_device_register_full(&mt_leds_info);
++	
++	if(mtk_leds_device == NULL) {
++		return -1;
++	}
++	
++	return 0;
++}
++
++static void __exit mt_leds_exit(void)
++{
++	platform_device_unregister(mtk_leds_device);
++}
++
++module_init(mt_leds_init);
++module_exit(mt_leds_exit);
++
++MODULE_AUTHOR("wangchuanqi@70mai.com");
++MODULE_DESCRIPTION("leds device");
++MODULE_LICENSE("GPL");
+\ No newline at end of file
+Index: linux-3.10.108/drivers/pwm/Kconfig
+===================================================================
+--- linux-3.10.108.orig/drivers/pwm/Kconfig
++++ linux-3.10.108/drivers/pwm/Kconfig
+@@ -201,4 +201,12 @@ config PWM_VT8500
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-vt8500.
+ 
++config PWM_MTK
++	tristate "Mediatek PWM support"
++	help
++	  Generic PWM framework driver for Mediatek ARM SoC.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-mxs.
++
+ endif
+Index: linux-3.10.108/drivers/pwm/Makefile
+===================================================================
+--- linux-3.10.108.orig/drivers/pwm/Makefile
++++ linux-3.10.108/drivers/pwm/Makefile
+@@ -17,3 +17,4 @@ obj-$(CONFIG_PWM_TIPWMSS)	+= pwm-tipwmss
+ obj-$(CONFIG_PWM_TWL)		+= pwm-twl.o
+ obj-$(CONFIG_PWM_TWL_LED)	+= pwm-twl-led.o
+ obj-$(CONFIG_PWM_VT8500)	+= pwm-vt8500.o
++obj-$(CONFIG_PWM_MTK)	+= pwm-mtk.o
+Index: linux-3.10.108/drivers/pwm/pwm-mtk.c
+===================================================================
+--- /dev/null
++++ linux-3.10.108/drivers/pwm/pwm-mtk.c
+@@ -0,0 +1,207 @@
++/*
++ * Mediatek Pulse Width Modulator driver
++ *
++ * Copyright (C) 2015 John Crispin <blogic@openwrt.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#define DEBUG
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++
++#include <asm/mach-ralink/rt_mmap.h>
++
++#define PWM_DRV_NAME "mt-pwm"
++#define NUM_PWM		4
++
++/* PWM registers and bits definitions */
++#define PWMCON			0x00
++#define PWMHDUR			0x04
++#define PWMLDUR			0x08
++#define PWMGDUR			0x0c
++#define PWMWAVENUM		0x28
++#define PWMDWIDTH		0x2c
++#define PWMTHRES		0x30
++
++/**
++ * struct mtk_pwm_chip - struct representing pwm chip
++ *
++ * @mmio_base: base address of pwm chip
++ * @chip: linux pwm chip representation
++ */
++struct mtk_pwm_chip {
++	void __iomem *mmio_base;
++	struct pwm_chip chip;
++};
++
++static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
++{
++	return container_of(chip, struct mtk_pwm_chip, chip);
++}
++
++static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
++				  unsigned long offset)
++{
++	return ioread32(chip->mmio_base + 0x10 + (num * 0x40) + offset);
++}
++
++static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
++				    unsigned int num, unsigned long offset,
++				    unsigned long val)
++{
++	iowrite32(val, chip->mmio_base + 0x10 + (num * 0x40) + offset);
++}
++
++static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			    int duty_ns, int period_ns)
++{
++	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
++	u32 resolution = 100 / 4;
++	u32 clkdiv = 0;
++    
++	while (period_ns / resolution  > 8191) {
++		clkdiv++;
++		resolution *= 2;
++	}
++
++	if (clkdiv > 7)
++		return -1;
++
++	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
++	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
++	return 0;
++}
++
++static int mtk_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
++	u32 val;
++
++	val = ioread32(pc->mmio_base);
++	val |= BIT(pwm->hwpwm);
++	iowrite32(val, pc->mmio_base);
++
++	return 0;
++}
++
++static void mtk_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
++	u32 val;
++
++	val = ioread32(pc->mmio_base);
++	val &= ~BIT(pwm->hwpwm);
++	iowrite32(val, pc->mmio_base);
++}
++
++static const struct pwm_ops mtk_pwm_ops = {
++	.config = mtk_pwm_config,
++	.enable = mtk_pwm_enable,
++	.disable = mtk_pwm_disable,
++	.owner = THIS_MODULE,
++};
++
++static int mt_pwm_probe(struct platform_device *pdev)
++{
++	struct mtk_pwm_chip *pc;
++    struct resource *r;
++	int ret;
++
++	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
++	if (!pc)
++		return -ENOMEM;
++
++	pc->mmio_base = RALINK_PWM_BASE;
++	if (IS_ERR(pc->mmio_base))
++		return PTR_ERR(pc->mmio_base);
++
++	platform_set_drvdata(pdev, pc);
++
++	pc->chip.dev = &pdev->dev;
++	pc->chip.ops = &mtk_pwm_ops;
++	pc->chip.base = -1;
++	pc->chip.npwm = NUM_PWM;
++
++	ret = pwmchip_add(&pc->chip);
++	if (ret < 0)
++		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
++
++	return ret;
++}
++
++static int mt_pwm_remove(struct platform_device *pdev)
++{
++	struct mtk_pwm_chip *pc = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < NUM_PWM; i++)
++		pwm_disable(&pc->chip.pwms[i]);
++
++	return pwmchip_remove(&pc->chip);
++}
++
++static struct platform_driver mt_pwm_driver = {
++	.probe		= mt_pwm_probe,
++	.remove		= mt_pwm_remove,
++	.driver		= {
++		.owner	= THIS_MODULE,
++		.name	= PWM_DRV_NAME,
++	},
++};
++
++static struct resource pwm_resources[] = {
++	{
++		.start		= RALINK_PWM_BASE,
++		.end		= RALINK_PWM_BASE + 0x1000,
++		.flags		= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device mtk_pwm_device = {
++	.name			= PWM_DRV_NAME,
++	.id				= 0,
++	.num_resources	= ARRAY_SIZE(pwm_resources),
++	.resource		= pwm_resources,
++};
++
++static struct pwm_lookup board_pwm_lookup[] = {
++    PWM_LOOKUP("mt-pwm.0", 0, NULL, "red"),
++    PWM_LOOKUP("mt-pwm.0", 1, NULL, "green"),
++    PWM_LOOKUP("mt-pwm.0", 2, NULL, "blue"),
++};
++
++static s32 __init mt_pwm_init(void)
++{
++    u32 val;
++
++	val = ioread32(RALINK_SYSCTL_BASE + 0x60);
++    val &= ~(0x3F << 26);
++    val |= (0x02 << 26); 
++    iowrite32(val,RALINK_SYSCTL_BASE + 0x60);
++
++    pwm_add_table(board_pwm_lookup, ARRAY_SIZE(board_pwm_lookup));
++	platform_device_register(&mtk_pwm_device);
++    return platform_driver_register(&mt_pwm_driver);
++}
++
++static void __exit mt_pwm_exit(void)
++{
++	platform_driver_unregister(&mt_pwm_driver);
++}
++
++module_init(mt_pwm_init);
++module_exit(mt_pwm_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("MediaTek PWM Driver");
+\ No newline at end of file

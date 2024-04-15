@@ -1,0 +1,11 @@
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
+@@ -125,7 +125,7 @@ endif
+ #endif
+ 
+ ifeq ($(CONFIG_MT7628_MAC),y)
+-	EXTRA_CFLAGS += -DMT_PS
++	#EXTRA_CFLAGS += -DMT_PS
+ 	spec_objs += $(SRC_DIR)/common/mt_ps.o
+ 	spec_objs += $(SRC_DIR)/common/mt_io.o
+ 	spec_objs += $(SRC_DIR)/tx_rx/txs.o

@@ -1,0 +1,21 @@
+Index: linux-3.10.108/drivers/net/raeth/raether.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/raeth/raether.c
++++ linux-3.10.108/drivers/net/raeth/raether.c
+@@ -3091,10 +3091,12 @@ int __init rather_probe(struct net_devic
+ 	//If reading mtd failed or mac0 is empty, generate a mac address
+ 	if (i < 0 || ((memcmp(addr.sa_data, zero1, 6) == 0) || (addr.sa_data[0] & 0x1)) || 
+ 	    (memcmp(addr.sa_data, zero2, 6) == 0)) {
+-		unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
+-		net_srandom(jiffies);
+-	memcpy(addr.sa_data, mac_addr01234, 5);
+-	addr.sa_data[5] = net_random()&0xFF;
++	// 	unsigned char mac_addr01234[5] = {0x00, 0x0C, 0x43, 0x28, 0x80};
++	// 	net_srandom(jiffies);
++	// memcpy(addr.sa_data, mac_addr01234, 5);
++	// addr.sa_data[5] = net_random()&0xFF;
++		random_ether_addr(addr.sa_data);
++		printk("generated random MAC address %02x:%02x:%02x:%02x:%02x:%02x",addr.sa_data[0],addr.sa_data[1],addr.sa_data[2],addr.sa_data[3],addr.sa_data[4],addr.sa_data[5]);
+ 	}
+ 
+ #ifdef CONFIG_RAETH_NAPI

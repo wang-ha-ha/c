@@ -1,0 +1,13 @@
+Index: linux-3.10.108/drivers/mtd/maps/ralink-flash.h
+===================================================================
+--- linux-3.10.108.orig/drivers/mtd/maps/ralink-flash.h
++++ linux-3.10.108/drivers/mtd/maps/ralink-flash.h
+@@ -18,7 +18,7 @@
+ #endif
+ #else
+ #define MTD_BOOT_PART_SIZE	0x30000
+-#define	MTD_CONFIG_PART_SIZE	0x10000
++#define	MTD_CONFIG_PART_SIZE	0x20000
+ #define	MTD_FACTORY_PART_SIZE	0x10000
+ #endif
+ #endif

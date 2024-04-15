@@ -1,0 +1,37 @@
+Index: linux-3.10.108/drivers/misc/verify_uboot.c
+===================================================================
+--- linux-3.10.108.orig/drivers/misc/verify_uboot.c
++++ linux-3.10.108/drivers/misc/verify_uboot.c
+@@ -12,7 +12,6 @@
+ #include <linux/mtd/mtd.h>
+ 
+ #define APPN_AME "/bin/verify_uboot"
+-#define MTD_NAME "firmware"
+ 
+ static struct delayed_work delay_work;
+ 
+@@ -21,16 +20,21 @@ struct sdesc {
+     char ctx[];
+ };
+ 
++extern int g_fw_partition;
++
+ static int read_from_flash(int from,unsigned char *buf, int len)
+ {
+     int read_len;
+     int total_len;
+     int mtd_offset;
+     unsigned char * tmp;
+-
+-    struct mtd_info *mtd = get_mtd_device_nm(MTD_NAME);
++	char *firmware_name = "firmware";
++	if(g_fw_partition == 1) {
++		firmware_name = "firmware1";
++	}
++    struct mtd_info *mtd = get_mtd_device_nm(firmware_name);
+     if (IS_ERR(mtd)) {
+-        printk(KERN_ERR "[env]ERROR %ld: No %s partition!\n", PTR_ERR(mtd), MTD_NAME);
++        printk(KERN_ERR "[env]ERROR %ld: No %s partition!\n", PTR_ERR(mtd), firmware_name);
+         return -ENODEV;
+     }
+ 

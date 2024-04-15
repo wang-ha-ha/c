@@ -1,0 +1,33 @@
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/cmm_cfg.c
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/cmm_cfg.c
+@@ -1425,7 +1425,7 @@ INT RTMP_COM_IoctlHandle(
+ #ifdef CONFIG_ATE
+ #ifdef CONFIG_QA
+ 		case CMD_RTPRIV_IOCTL_ATE:
+-			RtmpDoAte(pAd, wrq, pData);
++			//RtmpDoAte(pAd, wrq, pData);
+ 			break;
+ #endif /* CONFIG_QA */
+ #endif /* CONFIG_ATE */
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/tx_rx/wdev_rx.c
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/tx_rx/wdev_rx.c
+@@ -1889,7 +1889,7 @@ INT ate_rx_done_handle(RTMP_ADAPTER *pAd
+ 	if ((ATECtrl->bQARxStart == TRUE) || (ATECtrl->Mode & ATE_RXFRAME))
+ 	{
+ 		/* GetPacketFromRxRing() has copy the endian-changed RxD if it is necessary. */
+-		ATE_QA_Statistics(pAd, pRxBlk->pRxWI, pRxInfo, pHeader);
++		//ATE_QA_Statistics(pAd, pRxBlk->pRxWI, pRxInfo, pHeader);
+ 	}
+ 
+ #endif /* CONFIG_QA */
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
+@@ -482,7 +482,7 @@ EXTRA_CFLAGS += -DFIFO_EXT_SUPPORT
+ EXTRA_CFLAGS += -DMCS_LUT_SUPPORT
+ EXTRA_CFLAGS += -DUSE_BMC -DTHERMAL_PROTECT_SUPPORT -DCAL_FREE_IC_SUPPORT -DTRAFFIC_BASED_TXOP
+ EXTRA_CFLAGS += -DDATA_QUEUE_RESERVE -DEAPOL_QUEUE_SUPPORT -DDMA_RESET_SUPPORT -DWTBL_RATE_DEBUG
+-EXTRA_CFLAGS += -DEDCCA_RB
++#EXTRA_CFLAGS += -DEDCCA_RB
+ 
+ chip_objs += $(SRC_DIR)/../chips/mt7628.o\
+ 		$(SRC_DIR)/../hw_ctrl/cmm_asic_mt.o\

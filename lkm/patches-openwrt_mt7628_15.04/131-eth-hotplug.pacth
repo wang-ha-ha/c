@@ -1,0 +1,20 @@
+Index: linux-3.10.108/drivers/net/raeth/raether.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/raeth/raether.c
++++ linux-3.10.108/drivers/net/raeth/raether.c
+@@ -2287,6 +2287,15 @@ static irqreturn_t esw_interrupt(int irq
+ 		printk("RT305x_ESW: Link Status Changed\n");
+ 
+ 		stat_curr = *((volatile u32 *)(RALINK_ETH_SW_BASE+0x80));
++		printk("RT305x_ESW:0x%lx\n", stat_curr);
++		if(!(stat_curr & (1<<25))) {
++			printk("RT305x_ESW:netif_carrier_off \n");
++			netif_carrier_off(dev);
++		} else {
++			printk("RT305x_ESW:netif_carrier_on \n");
++			netif_carrier_on(dev);
++		}
++
+ #ifdef CONFIG_WAN_AT_P0
+ 		//link down --> link up : send signal to user application
+ 		//link up --> link down : ignore

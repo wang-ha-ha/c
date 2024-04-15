@@ -1,0 +1,15 @@
+Index: linux-3.10.108/drivers/net/raeth/raether.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/raeth/raether.c
++++ linux-3.10.108/drivers/net/raeth/raether.c
+@@ -4898,8 +4898,8 @@ void rt305x_esw_init(void)
+ #else
+ 	val = val & ~(MT7628_P0_EPHY_AIO_EN | MT7628_P1_EPHY_AIO_EN | MT7628_P2_EPHY_AIO_EN | MT7628_P3_EPHY_AIO_EN | MT7628_P4_EPHY_AIO_EN);
+ #endif
+-	if ((*((volatile u32 *)(RALINK_SYSCTL_BASE + 0x8))) & 0x10000)
+-		val &= ~0x1f0000;
++	// if ((*((volatile u32 *)(RALINK_SYSCTL_BASE + 0x8))) & 0x10000)
++	// 	val &= ~0x1f0000;
+ 	sysRegWrite(RT2880_AGPIOCFG_REG, val);
+ 
+ 	val = sysRegRead(RSTCTRL);

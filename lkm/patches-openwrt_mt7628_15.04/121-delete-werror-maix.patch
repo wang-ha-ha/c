@@ -1,0 +1,11 @@
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi_ap/Makefile
+@@ -533,7 +533,7 @@ endif
+ #  CFLAGS
+ ##################
+ EXTRA_CFLAGS += -DAGGREGATION_SUPPORT -DPIGGYBACK_SUPPORT -DWMM_SUPPORT  -DLINUX \
+-               -Wall -Wstrict-prototypes -Wno-trigraphs -Werror -Wframe-larger-than=4096
++               -Wall -Wstrict-prototypes -Wno-trigraphs  -Wframe-larger-than=4096
+ #-DDBG_DIAGNOSE -DDBG_RX_MCS -DDBG_TX_MCS
+ 
+ EXTRA_CFLAGS += -DCONFIG_AP_SUPPORT -DSCAN_SUPPORT -DAP_SCAN_SUPPORT

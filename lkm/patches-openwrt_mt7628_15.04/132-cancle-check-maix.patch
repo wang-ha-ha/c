@@ -1,0 +1,44 @@
+--- a/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/tx_rx/wdev_rx.c
++++ b/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/tx_rx/wdev_rx.c
+@@ -307,11 +307,11 @@ VOID Indicate_AMSDU_Packet(RTMP_ADAPTER
+ {
+ 	//UINT nMSDU;
+ 
+-	if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
++	/*if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
+ 		MTWF_LOG(DBG_CAT_RX, DBG_SUBCAT_ALL, DBG_LVL_WARN, ("%s:drop packet by PN mismatch!\n", __func__));
+ 		RELEASE_NDIS_PACKET(pAd, pRxBlk->pRxPacket, NDIS_STATUS_FAILURE);
+ 		return;
+-	}
++	}*/ // by sunyang
+ 
+ 	RTMP_UPDATE_OS_PACKET_INFO(pAd, pRxBlk, wdev_idx);
+ 	RTMP_SET_PACKET_WDEV(pRxBlk->pRxPacket, wdev_idx);
+@@ -413,11 +413,11 @@ VOID Indicate_Legacy_Packet(RTMP_ADAPTER
+ 	}
+ 	wdev = pAd->wdev_list[wdev_idx];
+ 
+-	if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
++	/*if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
+ 		MTWF_LOG(DBG_CAT_RX, DBG_SUBCAT_ALL, DBG_LVL_WARN, ("%s:drop packet by PN mismatch!\n", __func__));
+ 		RELEASE_NDIS_PACKET(pAd, pRxPacket, NDIS_STATUS_FAILURE);
+ 		return;
+-	}
++	}*/ //by sunyang
+ 
+ //+++Add by shiang for debug
+ if (1) {
+@@ -1153,11 +1153,11 @@ VOID Indicate_EAPOL_Packet(
+ 		return;
+ 	}
+ 
+-	if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
++	/*if (check_rx_pkt_pn_allowed(pAd, pRxBlk) == FALSE) {
+ 		MTWF_LOG(DBG_CAT_RX, DBG_SUBCAT_ALL, DBG_LVL_WARN, ("%s:drop packet by PN mismatch!\n", __func__));
+ 		RELEASE_NDIS_PACKET(pAd, pRxBlk->pRxPacket, NDIS_STATUS_FAILURE);
+ 		return;
+-	}
++	}*/ //by sunyang
+ 
+ 	pEntry = &pAd->MacTab.Content[pRxBlk->wcid];
+ 	if (pEntry == NULL)

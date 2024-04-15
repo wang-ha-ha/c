@@ -1,0 +1,13 @@
+Index: linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/scan.c
+===================================================================
+--- linux-3.10.108.orig/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/scan.c
++++ linux-3.10.108/drivers/net/wireless/mtk/mt7628/mt7628_wifi/embedded/common/scan.c
+@@ -943,6 +943,8 @@ VOID ScanNextChannel(RTMP_ADAPTER *pAd,
+ 
+ 					if (desiredSsidLen  > 0)
+ 					{
++						static int _times = 0;
++						if(_times++ % 300 == 0)
+ 						MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("%s:: specific the %s scanning\n", __FUNCTION__, 
+ 							pAd->ApCfg.ApCliTab[index].CfgSsid));
+ 

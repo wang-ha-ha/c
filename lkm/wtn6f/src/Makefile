@@ -1,0 +1,1 @@
+obj-m := wtn6f.o
