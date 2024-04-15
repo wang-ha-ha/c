@@ -16,10 +16,9 @@
 #define MTD_NAME "Env"
 #define ENV_BLOCK_SIZE 0x20000
 #define FIRST_BLOCK 0
-#define FIRST_BAK_BLOCK 5
+#define FIRST_BAK_BLOCK 4
 #define FIRST_BLOCK_OFFSET (FIRST_BLOCK * ENV_BLOCK_SIZE)
 #define FIRST_BAK_BLOCK_OFFSET (FIRST_BAK_BLOCK * ENV_BLOCK_SIZE)
-
 
 typedef struct
 {
@@ -50,8 +49,12 @@ typedef struct env_dev_s{
 static env_dev_t *g_env_dev;
 static env_dev_t *g_env_bak_dev;
 
+static int g_badblocks[8] = { 0 };
+
 static int read_from_flash(int from,unsigned char *buf, int len);
 static int write_to_flash(int to, char *buf, int len);
+static int markbad_flash(int from);
+// static void erase_callback (struct erase_info *self);
 
 static section_t * _get_sections(env_dev_t *dev, const char *section_name)
 {
@@ -363,12 +366,20 @@ static int write_to_flash(int to, char *buf, int len)
             
             bakaddr = mtd_offset & ~(mtd->erasesize - 1);
             
-            read_from_flash(bakaddr, bak, mtd->erasesize);
+            ret = read_from_flash(bakaddr, bak, mtd->erasesize);
+            if(ret < 0) {
+                printk(KERN_ERR "[env]ERROR:read error at 0x%llx.ret:%d\n", ei.addr,ret);
+                kfree(bak);
+                ret = -EIO;
+                goto error;
+            }
 
             memset(&ei, 0, sizeof(ei));
             ei.addr = bakaddr;
             ei.mtd = mtd;
             ei.len = mtd->erasesize;
+            // ei.callback = erase_callback;
+
             #ifdef DEBUG
             printk(KERN_ERR "to:0x%x mtd_offset:0x%x mtd->erasesize:0x%x\n",to,mtd_offset,mtd->erasesize);
             #endif
@@ -512,11 +523,33 @@ static int read_from_flash(int from,unsigned char *buf, int len)
     return read_len;
 }
 
+static int markbad_flash(int from)
+{
+    struct mtd_info *mtd = get_mtd_device_nm(MTD_NAME);
+    if (IS_ERR(mtd)) {
+        printk(KERN_ERR "[env]ERROR %ld: No %s partition!\n", PTR_ERR(mtd),MTD_NAME);
+        return -ENODEV;
+    }
+    mtd->flags |= MTD_WRITEABLE;
+    int ret = mtd_block_markbad(mtd,from);
+    mtd->flags &= ~MTD_WRITEABLE;
+    g_badblocks[from/ENV_BLOCK_SIZE] = 1;
+    #ifdef DEBUG
+    printk(KERN_ERR "[env]ERROR:mtd_block_markbad,0x%x,%d,%d\n",from,ret,from/ENV_BLOCK_SIZE);
+    #endif // DEBUG
+    return ret;
+}
+
+// static void erase_callback (struct erase_info *self)
+// {
+//     printk("erase_callback\n");
+// }
+
 static int find_good_block(env_dev_t *dev)
 {
     int i;
     for(i = 0;i < 4;i++) {
-        if (!mtd_block_isbad(dev->mtd, dev->start_offset + i * ENV_BLOCK_SIZE)) {
+        if (!mtd_block_isbad(dev->mtd, dev->start_offset + i * ENV_BLOCK_SIZE) && g_badblocks[i + dev->start_offset/ENV_BLOCK_SIZE] == 0 ) {
             dev->base_offset = dev->start_offset + i * ENV_BLOCK_SIZE;
             #ifdef DEBUG
             printk("[%s]:found block %d,0x%x\n", dev->name, i,dev->base_offset);
@@ -570,7 +603,8 @@ static int loadenv(env_dev_t *dev)
         printk(KERN_ERR"[%s]:%s offset:0x%x\n",dev->name,dev->sections[i].name,dev->sections[i].offset);
         #endif
         ret = read_from_flash(dev->sections[i].offset + dev->base_offset ,dev->sections[i].data, dev->sections[i].size);
-        if (ret < 0) {
+        if (ret < 0) {            
+            markbad_flash(dev->base_offset);
             return ret;
         }
 
@@ -620,15 +654,21 @@ static int saveenv(env_dev_t *dev, int no_sema)
     #ifdef DEBUG
     printk("TEST:save\n");
     #endif
-    if(find_good_block(dev) != 0) {
-        return -ENOMEM;
-    }
 
     if(g_env_dev->locked == 1) {
         if (!no_sema) {
             up(&dev->sem);
         }
         return -EPERM;
+    }
+
+retry:
+
+    if(find_good_block(dev) != 0) {
+        if (!no_sema) {
+            up(&dev->sem);
+        }
+        return -ENOMEM;
     }
 
     for(i = 0; i < dev->section_num; i++) {
@@ -647,7 +687,10 @@ static int saveenv(env_dev_t *dev, int no_sema)
         memcpy(dev->sections[i].data,(unsigned *)&env_crc32,4);
     
         ret = write_to_flash(dev->sections[i].offset + dev->base_offset, dev->sections[i].data, dev->sections[i].size);
-
+        if(ret < 0) {
+            markbad_flash(dev->base_offset);
+            goto retry;
+        }
         dev->sections[i].dirty_flag = 0;
     }
 
@@ -690,7 +733,7 @@ static int env_release(struct inode *inode, struct file *filp)
     printk("TEST:RELEASE\n");
     #endif
     saveenv(dev, 1);
-    saveenv(g_env_bak_dev, 0);
+    saveenv(g_env_bak_dev, 1);
 
     dev->refcnt--;
 
@@ -782,7 +825,7 @@ static long env_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     case ENV_IOCGET: {
         char *env_str;
         #ifdef DEBUG
-        printk(KERN_ERR"[env]: ENV_IOCGET section %s.karg.key:%s%d!\n", karg.section_name,karg.key);
+        printk(KERN_ERR"[env]: ENV_IOCGET section %s.karg.key:%s!\n", karg.section_name,karg.key);
         #endif
         if (karg.buf == NULL || karg.maxlen <= 0) {
             return -EINVAL;
@@ -870,7 +913,7 @@ static long env_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         printk("TEST:ENV_IOCLOCK\n");
         #endif
         saveenv(dev, 1);
-        saveenv(g_env_bak_dev, 0);
+        saveenv(g_env_bak_dev, 1);
         dev->locked = 1;
         up(&dev->sem);
         break;
@@ -950,9 +993,9 @@ static __init int env_init(void)
     g_env_dev->base_offset = 0;
     g_env_dev->start_offset = FIRST_BLOCK_OFFSET;
     ret = loadenv(g_env_dev);
-    if (ret < 0) {
-        goto fail;
-    }
+    // if (ret < 0) {
+    //     goto fail;
+    // }
 
     //init g_env_bak_dev init
     g_env_bak_dev = kzalloc(sizeof(env_dev_t), GFP_KERNEL);
@@ -968,9 +1011,9 @@ static __init int env_init(void)
     g_env_bak_dev->base_offset = 0;
     g_env_bak_dev->start_offset = FIRST_BAK_BLOCK_OFFSET;
     ret = loadenv(g_env_bak_dev);
-    if (ret < 0) {
-        goto fail;
-    }
+    // if (ret < 0) {
+    //     goto fail;
+    // }
 
     //g_env_dev and g_env_bak_dev compare, to decide which one replace the other.
     if (env_check_and_update(g_env_dev, g_env_bak_dev)) {
