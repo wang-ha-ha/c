@@ -1,0 +1,76 @@
+#!/bin/sh
+insmod /lib/modules/usb-common.ko
+insmod /lib/modules/udc-core.ko
+insmod /lib/modules/usbcore.ko
+insmod /lib/modules/dwc2.ko
+insmod /lib/modules/libcomposite.ko
+# insmod /lib/modules/videobuf2-core.ko
+# insmod /lib/modules/videobuf2-v4l2.ko
+# insmod /lib/modules/videobuf2-memops.ko
+insmod /lib/modules/videobuf2-vmalloc.ko
+insmod /lib/modules/usb_f_uvc.ko
+
+mount -t configfs none /sys/kernel/config
+
+cd /sys/kernel/config/usb_gadget
+mkdir g1
+cd g1
+
+echo 0x1d6b > idVendor
+echo 0x0102 >idProduct
+echo 0x0200 > bcdDevice
+echo 0xef > bDeviceClass
+echo 0x02 >bDeviceSubClass
+echo 0x01 >bDeviceProtocol
+
+mkdir -p strings/0x409
+mkdir -p configs/c.1/strings/0x409
+
+echo "70mai" > strings/0x409/manufacturer
+echo "70maiCAM" > strings/0x409/product
+echo "12345678" > strings/0x409/serialnumber
+
+mkdir -p functions/uvc.usb0/control/header/h
+cd functions/uvc.usb0/control/
+echo "0x0100" > header/h/bcdUVC
+echo "48000000" > header/h/dwClockFrequency
+ln -s header/h class/fs
+ln -s header/h class/ss
+
+cd ../../../
+
+mkdir -p functions/uvc.usb0/streaming/mjpeg/m/720p
+cat <<EOF > functions/uvc.usb0/streaming/mjpeg/m/720p/dwFrameInterval
+666666
+EOF
+
+echo "2560" > functions/uvc.usb0/streaming/mjpeg/m/720p/wWidth
+echo "1440" > functions/uvc.usb0/streaming/mjpeg/m/720p/wHeight
+echo "884736000" > functions/uvc.usb0/streaming/mjpeg/m/720p/dwMinBitRate
+echo "1769472000" > functions/uvc.usb0/streaming/mjpeg/m/720p/dwMaxBitRate
+echo "5529600" > functions/uvc.usb0/streaming/mjpeg/m/720p/dwMaxVideoFrameBufferSize
+echo "666666" > functions/uvc.usb0/streaming/mjpeg/m/720p/dwDefaultFrameInterval
+echo "0" > functions/uvc.usb0/streaming/mjpeg/m/720p/bmCapabilities
+
+mkdir functions/uvc.usb0/streaming/header/h
+cd functions/uvc.usb0/
+ln -s streaming/mjpeg/m/ streaming/header/h/
+
+ln -s streaming/header/h/ streaming/class/fs/
+ln -s streaming/header/h/ streaming/class/hs/
+ln -s streaming/header/h/ streaming/class/ss/
+cd ../../
+
+mkdir configs/c.1/
+echo 500 > configs/c.1/MaxPower
+echo  0xc0 > configs/c.1/bmAttributes
+
+ln -s functions/uvc.usb0 configs/c.1/
+
+mkdir functions/acm.GS0
+ln -s functions/acm.GS0 configs/c.1/
+ls /dev/ttyGS0
+
+ls /sys/class/udc > UDC
+ls /dev/video0
+
