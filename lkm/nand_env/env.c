@@ -352,128 +352,90 @@ static int write_to_flash(int to, char *buf, int len)
     total_len = 0;
 
     while( len > 0) {
-        if ((len & (mtd->erasesize-1)) || (len < mtd->erasesize)) {
-            char *bak;
-            int write_len;
-            int piece_size;
-            unsigned int piece, bakaddr;
-            bak = kzalloc(mtd->erasesize, GFP_KERNEL);
-            
-            if(bak == NULL) {
+        bool bFree = false;
+        uint8_t *pBuf = NULL;
+        int offset = mtd_offset & (mtd->erasesize - 1);
+        int write_len = len > mtd->erasesize - offset ? mtd->erasesize - offset : len;
+        uint32_t addr = mtd_offset & ~(mtd->erasesize - 1);
+        uint32_t _len = 0;
+
+        //read
+        if (offset || write_len != mtd->erasesize) {
+            pBuf = kzalloc(mtd->erasesize, GFP_KERNEL);
+            if (pBuf == NULL) {
                 ret = -ENOMEM;
                 goto error;
             }
-            
-            bakaddr = mtd_offset & ~(mtd->erasesize - 1);
-            
-            ret = read_from_flash(bakaddr, bak, mtd->erasesize);
-            if(ret < 0) {
-                printk(KERN_ERR "[env]ERROR:read error at 0x%llx.ret:%d\n", ei.addr,ret);
-                kfree(bak);
-                ret = -EIO;
-                goto error;
-            }
-
-            memset(&ei, 0, sizeof(ei));
-            ei.addr = bakaddr;
-            ei.mtd = mtd;
-            ei.len = mtd->erasesize;
-            // ei.callback = erase_callback;
-
-            #ifdef DEBUG
-            printk(KERN_ERR "to:0x%x mtd_offset:0x%x mtd->erasesize:0x%x\n",to,mtd_offset,mtd->erasesize);
-            #endif
-            ret = mtd_erase(mtd, &ei);
-            if (ret) {
-                printk(KERN_ERR "[env]ERROR:erase error at 0x%llx.ret:%d\n", ei.addr,ret);
-                kfree(bak);
-                ret = -EIO;
-                goto error;
-            }
-
-            piece = mtd_offset & (mtd->erasesize - 1);
-            piece_size = min((uint32_t)len, mtd->erasesize - piece);
-            memcpy(bak + piece, buf + mtd_offset - to, piece_size);
-            write_len = 0;
-            
-            #ifdef DEBUG
-            printk(KERN_ERR "[env]mtd_offset:0x%llx,piece:0x%x piece_size:%d\n", ei.addr,piece,piece_size);
-            #endif
-            
-            while (write_len < mtd->erasesize) {
-                int _len;
-                #ifdef DEBUG
-                printk(KERN_ERR "[env]write_len:0x%x\n", write_len);
-                #endif
-                ret = mtd_write(mtd, bakaddr + write_len, mtd->erasesize - write_len, &_len,
-                        bak + write_len);
-                if (ret) {
-                    kfree(bak);
-                    ret = -EIO;
-                    goto error;
-                }
-
-                if (_len == 0)
-                    break;
-                else if (_len < 0) {
-                    printk(KERN_ERR"[env]ERROR: write failure\n");
-                    kfree(bak);
-                    ret = -EIO;
-                    goto error;
-                }
-
-                total_len += _len;
-                write_len += _len;
-                len -= _len;
-            }
-
-            kfree(bak);
+            read_from_flash(addr, pBuf, mtd->erasesize);
+            memcpy(pBuf + offset, buf + total_len, write_len);
+            bFree = true;
+        } else {
+            pBuf = buf + total_len;
+            bFree = false;
         }
-        else {
-            int write_len;
 
-            memset(&ei, 0, sizeof(ei));
-            ei.addr = mtd_offset & ~(mtd->erasesize - 1);
-            ei.mtd = mtd;
-            ei.len = mtd->erasesize;
-            ret = mtd_erase(mtd, &ei);
-            #ifdef DEBUG
-            printk(KERN_ERR "[env]mtd_offset:0x%llx\n", ei.addr);
-            #endif
-            //    if (ret || ei.state == MTD_ERASE_FAILED) {
+        //erase
+        memset(&ei, 0, sizeof(ei));
+        ei.addr = addr;
+        ei.mtd = mtd;
+        ei.len = mtd->erasesize;
+        ret = mtd_erase(mtd, &ei);
+        if (!ret) {
+            set_current_state(TASK_UNINTERRUPTIBLE);
+            add_wait_queue(&waitq, &wait);
+            if (ei.state != MTD_ERASE_DONE &&
+                ei.state != MTD_ERASE_FAILED)
+                schedule();
+            remove_wait_queue(&waitq, &wait);
+            set_current_state(TASK_RUNNING);
+
+            ret = (ei.state == MTD_ERASE_FAILED)?-EIO:0;
+        }
+        if (ret) {
+            printk(KERN_ERR "[env]ERROR:erase error at 0x%llx.ret:%d\n", ei.addr,ret);
+            if (bFree) {
+                kfree(pBuf);
+            }
+            ret = -EIO;
+            goto error;
+        }
+
+        int current_total_write_len = 0;
+        //write
+        while (current_total_write_len < mtd->erasesize) {
+            ret = mtd_write(mtd, addr + current_total_write_len, mtd->erasesize - current_total_write_len, &_len, pBuf + current_total_write_len);
             if (ret) {
-                printk(KERN_ERR "[env]ERROR:erase error at 0x%llx\n", ei.addr);
+                if (bFree) {
+                    kfree(pBuf);
+                }
                 ret = -EIO;
                 goto error;
             }
-
-            write_len = 0;
-
-            while (write_len < mtd->erasesize) {
-                int _len;
-                ret = mtd_write(mtd, mtd_offset, mtd->erasesize - write_len, &_len,
-                        buf + mtd_offset - to);
-                if (ret) {
-                    ret = -EIO;
-                    goto error;
-                }
-                #ifdef DEBUG
-                printk(KERN_ERR "[env]write_len:%d,_len:%d\n",write_len, _len);
-                #endif
-                if (_len == 0)
-                    break;
-                else if (_len < 0) {
-                    printk(KERN_ERR"[env]ERROR: write failure\n");
-                    ret = -EIO;
-                    goto error;
-                }
-
-                total_len += _len;
-                write_len += _len;
-                mtd_offset += _len;
-                len -= _len;
+            if (_len == 0) {
+                break;
             }
+            else if (_len < 0) {
+                printk(KERN_ERR"[env]ERROR: write failure\n");
+                if (bFree) {
+                    kfree(pBuf);
+                }
+                ret = -EIO;
+                goto error;
+            }
+            current_total_write_len += _len;
         }
+
+        if (bFree) {
+            kfree(pBuf);
+        }
+        if (current_total_write_len != mtd->erasesize) {
+            ret = -EIO;
+            goto error;
+        }
+        //update
+        mtd_offset += write_len;
+        len -= write_len;
+        total_len += write_len;
     }
 
     mtd->flags &= ~MTD_WRITEABLE;
